@@ -9,6 +9,7 @@ import { IBMPlexMono_500Medium } from "@expo-google-fonts/ibm-plex-mono";
 import { Stack } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -30,7 +31,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" backgroundColor="#FAF9F6" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
@@ -38,7 +39,11 @@ export default function RootLayout() {
           name="quick-add"
           options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
         />
+        <Stack.Screen
+          name="filter"
+          options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
+        />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 }

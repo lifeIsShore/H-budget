@@ -1,8 +1,8 @@
 # H-Budget — Project Status
 
-**Last updated:** 2026-08-28
-**Current phase:** Phase 2 complete — starting Phase 3 (Ledger)
-**Overall progress:** ~25% done
+**Last updated:** 2026-08-29
+**Current phase:** Phase 3 (Ledger) core built — Phase 4 (Detail/Edit) next, or start backend now
+**Overall progress:** ~40% done
 
 Update this file manually (or ask me to update it) as work progresses.
 
@@ -14,12 +14,31 @@ Update this file manually (or ask me to update it) as work progresses.
 | :--- | :--- | :--- |
 | 1 | Project setup, design system, base components, database | Done |
 | 2 | Navigation shell, Dashboard UI, Quick-Add UI | Done |
-| 3 | Ledger (transaction list, search, filter, swipe) | Not started |
+| 3 | Ledger (transaction list, search, filter, swipe) | Core done — see open items below |
 | 4 | Transaction Detail & Edit Modal, Delete dialog | Not started |
-| 5 | Statistics screen (By Purpose / Category / Vendor) | Not started |
-| 6 | Settings, Manage Purposes/Categories, Export/Backup | Not started |
-| 7 | SQLite data layer — wire all screens to real data | Not started |
+| 5 | Statistics screen (By Purpose / Category / Vendor) | Not started — stub route only |
+| 6 | Settings, Manage Purposes/Categories, Export/Backup | Not started — stub route only |
+| 7 | SQLite data layer — wire all screens to real data | **Not started — can begin now, see below** |
 | 8 | Toast/Snackbar system, error states, polish & testing | Not started |
+
+---
+
+## Can the backend start now?
+
+**Yes.** The data layer (Phase 7) is independent of the remaining UI phases —
+it just needs the schema in `Expense Tracker/04_Data_Model.md` and the query
+list below. It does not need Phases 4–6 finished first. Two ways to sequence
+it from here:
+
+- **Backend now, UI continues in parallel** — start Phase 7 (SQLite schema,
+  migrations, CRUD, computed queries) while UI work continues on Phase 4
+  (Detail/Edit modal). Once both exist, the wiring step (replacing sample
+  data with real queries in Dashboard/Quick-Add/Ledger) is small.
+- **Finish all screens first, wire once at the end** — keep going through
+  Phase 4–6 UI, then do one wiring pass. Less context-switching, but nothing
+  is testable against real data until later.
+
+Either works; nothing above is blocking the backend from starting today.
 
 ---
 
@@ -29,106 +48,74 @@ Update this file manually (or ask me to update it) as work progresses.
 - [x] Expo + React Native + TypeScript project initialized
 - [x] NativeWind / Tailwind configured (`tailwind.config.js`)
 - [x] Design System documented — `docs/DESIGN_SYSTEM.md`
-  - [x] Color tokens (ink-on-paper palette, brass accent, muted positive/negative)
-  - [x] Typography — IBM Plex Mono for all amounts, IBM Plex Sans for text
-  - [x] Shape & elevation rules (hairline borders over shadows)
 - [x] `theme/tokens.ts` — touch targets, icon sizes, spacing constants
-- [x] Base UI components
-  - [x] `Button` (positive / negative / brand / outline variants, loading state)
-  - [x] `Chip` (selected/unselected, dashed warning variant)
-  - [x] `Card` (hairline border, 8dp radius)
-  - [x] `Amount` (hero + row size, color-coded, IBM Plex Mono)
-  - [x] `EmptyState` (icon + title + subtitle)
-  - [x] `Skeleton` (loading placeholder for Dashboard)
+- [x] `types/models.ts` — shared `Transaction` / `Purpose` shapes (match `04_Data_Model.md`)
+- [x] Base UI components: `Button`, `Chip`, `Card`, `Amount`, `EmptyState`, `Skeleton`
+- [x] `GestureHandlerRootView` wired at root (needed for Ledger swipe actions)
 
 ---
 
 ### Navigation Shell
-- [x] Bottom Tab Navigator (Dashboard, Ledger, Stats, Settings)
+- [x] Bottom Tab Navigator (Dashboard, Ledger, Stats, Settings) — all 4 routes now resolve
 - [x] Tab icons — Material Icons, active/inactive color states
-- [x] `app/_layout.tsx` root layout
+- [x] `app/_layout.tsx` root layout, modal routes registered (`quick-add`, `filter`)
 
 ---
 
-### Screen 1: Dashboard
-- [x] Top App Bar — title + Reconciled/Action-needed badge
-- [x] Hero Balance Card — balance, received/spent row, accent rule, opening balance
-- [x] Warning Banner — unassigned count, "Classify >" link, navigates to Ledger
-- [x] Purpose Cards grid — received, spent, remaining, progress bar
-- [x] Recent Activity list — transaction rows (vendor, purpose badge, category, amount, date)
-- [x] Empty state for Recent Activity
-- [x] Sticky Action Bar — "+ Income" and "- Expense" buttons
+### Screen 1: Dashboard — Done (UI)
+- [x] All sections built (see prior status entry for full breakdown)
 - [ ] **Wire to real SQLite data** (currently uses sample data)
 
 ---
 
-### Screen 2: Quick-Add Sheet
-- [x] Opens as full-screen modal from Dashboard action buttons
-- [x] Dimmed background overlay, tapping closes
-- [x] Drag handle + Header row + Close button
-- [x] Expense / Income toggle (color-coded: red / green fill)
-- [x] Amount hero input — IBM Plex Mono 34sp, EUR prefix, decimal keyboard, auto-focus
-- [x] Vendor / Source text input with dynamic label
-- [x] Purpose chip group (from hardcoded list, Unassigned chip with dashed border)
-- [x] Category chip group (from hardcoded list)
-- [x] Note optional text input
-- [x] Save button — disabled when amount = 0, loading state on save
-- [ ] Date selector (currently missing — needs native DatePicker)
+### Screen 2: Quick-Add Sheet — Done (UI)
+- [x] All fields, toggle, chips, save button states
+- [ ] Date selector (still missing — needs native DatePicker)
 - [ ] Vendor autocomplete dropdown (currently plain input)
 - [ ] **Wire onSave to SQLite insert** (currently a 400ms fake delay)
-- [ ] Load Purposes and Categories from SQLite instead of hardcoded arrays
+- [ ] Load Purposes/Categories from SQLite instead of hardcoded arrays
 
 ---
 
-### Screen 3: Ledger
-- [ ] Search bar (live filter by vendor / note / amount)
-- [ ] Filter button + active filter chip bar
-- [ ] Filter Bottom Sheet (Type / Purpose / Category / Date Range)
-- [ ] Transaction list grouped by date (sticky section headers with daily total)
-- [ ] Transaction list item layout (icon, vendor, purpose badge, category, amount, time)
-- [ ] Empty state (no transactions / no search results)
-- [ ] Swipe left — delete action reveal
-- [ ] Swipe right — edit action reveal
-- [ ] Tap row — opens Transaction Detail Modal
+### Screen 3: Ledger — Core done
+- [x] Search bar (live filter by vendor / category / amount)
+- [x] Filter button with active-filter dot badge
+- [x] Active filter chip bar + "Clear All" (currently only reflects the
+      "unassigned" deep-link from the Dashboard warning banner)
+- [x] Filter Bottom Sheet (`app/filter.tsx`) — Type / Purpose / Category multi-select, Reset/Apply
+- [x] Transaction list grouped by date, sticky section headers with daily total (`SectionList`)
+- [x] Transaction row layout (icon, vendor, purpose badge, category, amount, time)
+- [x] Empty states (no transactions / no search or filter results)
+- [x] Swipe left — edit reveal; swipe right — delete reveal (`components/SwipeableTransactionRow.tsx`)
+- [x] Tap row → navigates to `/transaction/[id]` (route not created yet — Phase 4)
+- [ ] Filter Sheet selections don't persist back to the Ledger screen yet (no shared filter state)
+- [ ] Date Range filter (needs `@react-native-community/datetimepicker`, not yet a dependency)
+- [ ] Swipe-delete currently a no-op — needs Delete Confirmation Dialog (Phase 4)
+- [ ] **Wire to real SQLite data** (currently uses sample data)
 
 ---
 
-### Screen 4: Transaction Detail & Edit Modal
-- [ ] View Mode — amount, date, all fields in read-only table
-- [ ] Edit button — switches to Edit Mode
-- [ ] Edit Mode — all fields editable (same inputs as Quick-Add)
-- [ ] Edit amount notice banner ("this will adjust your balance by X")
-- [ ] Save Changes button (disabled if nothing changed)
-- [ ] Cancel button (discards edits)
-- [ ] Delete button — opens Delete Confirmation Dialog
-- [ ] Delete Confirmation Dialog (two-step: confirm shows balance impact)
-- [ ] Undo toast after deletion (3-second window)
+### Screen 4: Transaction Detail & Edit Modal — Not started
+- [ ] `/transaction/[id]` route (referenced by Ledger taps, does not exist yet)
+- [ ] View Mode, Edit Mode, edit-amount notice banner
+- [ ] Delete Confirmation Dialog
+- [ ] Undo toast after deletion
 
 ---
 
-### Screen 5: Statistics
-- [ ] Month selector (< August 2026 >)
-- [ ] Summary row (Received / Spent for selected month)
-- [ ] Sub-tab switcher: By Purpose / By Category / By Vendor
-- [ ] By Purpose view — purpose cards with progress bar
-- [ ] By Category view — ranked list with proportional bar
-- [ ] By Vendor view — ranked list with transaction count
-- [ ] Empty state for months with no data
+### Screen 5: Statistics — Stub only
+- [x] Stub route at `app/(tabs)/stats.tsx` (prevents tab 404, no real content)
+- [ ] Everything else per spec
 
 ---
 
-### Screen 6: Settings
-- [ ] Section: Account — Opening Balance edit dialog, Currency selector
-- [ ] Section: Customization — links to Manage Purposes / Manage Categories
-- [ ] Section: Data & Backup — Export CSV, Backup JSON, Restore JSON
-- [ ] Section: About — App version (non-tappable)
-- [ ] Manage Purposes sub-screen (list, inline edit, add new, delete with protection)
-- [ ] Manage Categories sub-screen (same layout as Manage Purposes)
-- [ ] Restore confirmation dialog + schema validation
+### Screen 6: Settings — Stub only
+- [x] Stub route at `app/(tabs)/settings.tsx` (prevents tab 404, no real content)
+- [ ] Everything else per spec, incl. Manage Purposes/Categories sub-screens
 
 ---
 
-### Data Layer (SQLite)
+### Data Layer (SQLite) — Not started, can begin now
 - [ ] Database initialization & migrations (`transactions`, `purposes`, `categories`, `settings`, `audit_log`)
 - [ ] Seed default Purposes (High School, University, General) on first run
 - [ ] Seed default Categories (Travel, Food, Equipment, Software, Other) on first run
@@ -146,8 +133,8 @@ Update this file manually (or ask me to update it) as work progresses.
 ### Global Systems
 - [ ] Toast / Snackbar component (auto-dismiss 3s, UNDO action for deletes)
 - [ ] Error validation messages (invalid amount, duplicate name, etc.)
-- [ ] `icon_warning` + all icons verified no-emoji (SVG Material Icons only)
-- [ ] Keyboard-avoidance tested on Android
+- [x] No-emoji icons verified (Material Icons only, all screens so far)
+- [ ] Keyboard-avoidance tested on Android device
 - [ ] All touch targets verified >= 48dp on device
 - [ ] Quick-Add speed test: entry to save in < 5 seconds
 
@@ -160,12 +147,15 @@ Update this file manually (or ask me to update it) as work progresses.
 | [docs/DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) | Color tokens, typography, shape — supersedes spec section 1 |
 | [Expense Tracker/05_UI_UX_Specification.md](../Expense%20Tracker/05_UI_UX_Specification.md) | Full screen specs, button matrix, edge cases |
 | [Expense Tracker/04_Data_Model.md](../Expense%20Tracker/04_Data_Model.md) | SQLite schema, field types, constraints, backup format |
-| [Expense Tracker/02_User_Flows.md](../Expense%20Tracker/02_User_Flows.md) | Step-by-step user journeys |
-| [Expense Tracker/07_MVP_Roadmap.md](../Expense%20Tracker/07_MVP_Roadmap.md) | Phase plan with day estimates |
-| [Expense Tracker/08_Testing_Plan.md](../Expense%20Tracker/08_Testing_Plan.md) | All test cases to run before shipping |
+| [types/models.ts](../types/models.ts) | Shared `Transaction` / `Purpose` TS types |
 | [theme/tokens.ts](../theme/tokens.ts) | Touch target, icon size, spacing constants |
 | [app/(tabs)/index.tsx](../app/(tabs)/index.tsx) | Dashboard screen |
+| [app/(tabs)/ledger.tsx](../app/(tabs)/ledger.tsx) | Ledger screen |
+| [app/(tabs)/stats.tsx](../app/(tabs)/stats.tsx) | Stats screen (stub) |
+| [app/(tabs)/settings.tsx](../app/(tabs)/settings.tsx) | Settings screen (stub) |
 | [app/quick-add.tsx](../app/quick-add.tsx) | Quick-Add modal screen |
+| [app/filter.tsx](../app/filter.tsx) | Ledger filter modal screen |
+| [components/SwipeableTransactionRow.tsx](../components/SwipeableTransactionRow.tsx) | Swipeable ledger row |
 | [components/ui/](../components/ui/) | Reusable base UI components |
 
 ---
@@ -178,5 +168,10 @@ Update this file manually (or ask me to update it) as work progresses.
 | 2 | Vendor autocomplete not implemented | `app/quick-add.tsx` | Medium |
 | 3 | Quick-Add save is a fake delay, no SQLite insert | `app/quick-add.tsx` | High — blocked on data layer |
 | 4 | Dashboard uses hardcoded sample data | `app/(tabs)/index.tsx` | High — blocked on data layer |
-| 5 | Ledger, Stats, Settings tab screens are empty stubs | `app/(tabs)/` | Phase 3–6 |
-| 6 | No Toast/Snackbar system yet | Global | Phase 8 |
+| 5 | Ledger uses hardcoded sample data | `app/(tabs)/ledger.tsx` | High — blocked on data layer |
+| 6 | Filter Sheet selections don't flow back to Ledger | `app/filter.tsx`, `app/(tabs)/ledger.tsx` | Medium |
+| 7 | Ledger swipe-delete is a no-op (needs Phase 4 dialog) | `app/(tabs)/ledger.tsx` | Medium |
+| 8 | `/transaction/[id]` route doesn't exist yet | Phase 4 | High — next UI phase |
+| 9 | Date Range filter omitted (needs a date-picker dependency) | `app/filter.tsx` | Low |
+| 10 | Stats, Settings tab screens are stubs | `app/(tabs)/` | Phase 5–6 |
+| 11 | No Toast/Snackbar system yet | Global | Phase 8 |
