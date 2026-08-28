@@ -5,22 +5,13 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { SwipeableTransactionRow } from "@/components/SwipeableTransactionRow";
 import { EmptyState } from "@/components/ui/EmptyState";
-import type { Transaction } from "@/types/models";
+import { sampleTransactions } from "@/data/sampleData";
 
 /**
- * UI-only, sample data — shapes match 04_Data_Model.md so wiring real
- * SQLite queries later is a drop-in. Filter Sheet selections don't persist
- * back here yet (no shared filter state / router params).
+ * UI-only, sample data (data/sampleData.ts) — shapes match 04_Data_Model.md
+ * so wiring real SQLite queries later is a drop-in. Filter Sheet selections
+ * don't persist back here yet (no shared filter state / router params).
  */
-
-const sampleTransactions: (Transaction & { time: string })[] = [
-  { id: "1", vendor: "Deutsche Bahn", amount: -23.5, purpose: "University", category: "Travel", date: "Thursday, August 28, 2026", time: "14:32" },
-  { id: "2", vendor: "Mentorship Grant", amount: 500, purpose: "University", category: null, date: "Thursday, August 28, 2026", time: "09:10" },
-  { id: "3", vendor: null, amount: -48.2, purpose: null, category: "Equipment", date: "Thursday, August 28, 2026", time: "08:55" },
-  { id: "4", vendor: "Copyshop Wagner", amount: -12.4, purpose: "High School", category: "Equipment", date: "Wednesday, August 27, 2026", time: "17:02" },
-  { id: "5", vendor: "REWE", amount: -34.9, purpose: "General", category: "Food", date: "Wednesday, August 27, 2026", time: "12:41" },
-  { id: "6", vendor: "Kaiserslautern Uni Library", amount: -6.0, purpose: "University", category: "Other", date: "Tuesday, August 26, 2026", time: "10:15" },
-];
 
 // Toggle while building — remove once wired to real data.
 const DEMO_STATE: "loaded" | "empty" = "loaded";
@@ -142,9 +133,7 @@ export default function Ledger() {
               transaction={item}
               onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id } })}
               onEdit={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id, edit: "1" } })}
-              onDelete={() => {
-                // TODO: open Delete Confirmation Dialog once wired to real data
-              }}
+              onDelete={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id, confirmDelete: "1" } })}
             />
           )}
         />

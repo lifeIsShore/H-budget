@@ -8,41 +8,15 @@ import { Amount } from "@/components/ui/Amount";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import { sampleTransactions, samplePurposes } from "@/data/sampleData";
+import type { Transaction, Purpose } from "@/types/models";
 
 /**
  * UI-only screen — wired to sample data, not the SQLite layer yet (that's
- * the backend side of this project). Shapes below match 04_Data_Model.md
- * and 03_Features.md section 1 so wiring later is a drop-in of real
- * queries in place of `sampleTransactions` / `samplePurposes`.
+ * the backend side of this project). Shapes match 04_Data_Model.md and
+ * 03_Features.md section 1 so wiring later is a drop-in of real queries
+ * in place of data/sampleData.ts.
  */
-
-type Transaction = {
-  id: string;
-  vendor: string | null;
-  amount: number; // negative = expense, positive = income
-  purpose: string | null;
-  category: string | null;
-  date: string;
-};
-
-type Purpose = {
-  id: string;
-  name: string;
-  received: number;
-  spent: number;
-};
-
-const samplePurposes: Purpose[] = [
-  { id: "1", name: "University", received: 1200, spent: 860 },
-  { id: "2", name: "High School", received: 800, spent: 525 },
-];
-
-const sampleTransactions: Transaction[] = [
-  { id: "1", vendor: "Deutsche Bahn", amount: -23.5, purpose: "University", category: "Travel", date: "Today" },
-  { id: "2", vendor: "Mentorship Grant", amount: 500, purpose: "University", category: null, date: "Today" },
-  { id: "3", vendor: null, amount: -48.2, purpose: null, category: "Equipment", date: "Yesterday" },
-  { id: "4", vendor: "Copyshop Wagner", amount: -12.4, purpose: "High School", category: "Equipment", date: "Yesterday" },
-];
 
 // Toggle these to preview states while building — remove once wired to real data.
 const DEMO_STATE: "loaded" | "loading" | "empty" = "loaded";
@@ -218,6 +192,7 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   const isExpense = transaction.amount < 0;
   return (
     <Pressable
+      onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: transaction.id } })}
       className="flex-row items-center bg-surface border border-border rounded-card px-3.5 active:opacity-70"
       style={{ minHeight: 64 }}
     >

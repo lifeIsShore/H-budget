@@ -1,7 +1,7 @@
 import { Pressable, Text, ActivityIndicator, PressableProps } from "react-native";
 import { touchTarget } from "@/theme/tokens";
 
-type Variant = "primary" | "positive" | "negative" | "outline" | "ghost";
+type Variant = "primary" | "positive" | "negative" | "outline" | "ghost" | "muted";
 
 type Props = PressableProps & {
   label: string;
@@ -17,6 +17,7 @@ const fillClasses: Record<Variant, string> = {
   negative: "bg-negative",
   outline: "bg-transparent border border-brand",
   ghost: "bg-transparent",
+  muted: "bg-transparent",
 };
 
 const textClasses: Record<Variant, string> = {
@@ -25,6 +26,7 @@ const textClasses: Record<Variant, string> = {
   negative: "text-surface",
   outline: "text-brand",
   ghost: "text-negative",
+  muted: "text-ink-muted",
 };
 
 /**
@@ -60,7 +62,11 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === "outline" || variant === "ghost" ? "#22211F" : "#FAF9F6"}
+          color={
+            variant === "outline" || variant === "ghost" || variant === "muted"
+              ? "#22211F"
+              : "#FAF9F6"
+          }
         />
       ) : (
         <Text

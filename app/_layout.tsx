@@ -43,6 +43,10 @@ export default function RootLayout() {
           name="filter"
           options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
         />
+        <Stack.Screen
+          name="transaction/[id]"
+          options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
+        />
       </Stack>
     </GestureHandlerRootView>
   );

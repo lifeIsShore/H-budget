@@ -1,8 +1,8 @@
 # H-Budget — Project Status
 
 **Last updated:** 2026-08-29
-**Current phase:** Phase 3 (Ledger) core built — Phase 4 (Detail/Edit) next, or start backend now
-**Overall progress:** ~40% done
+**Current phase:** Phase 6 (Settings) in progress, or start backend now
+**Overall progress:** ~70% done
 
 Update this file manually (or ask me to update it) as work progresses.
 
@@ -15,9 +15,9 @@ Update this file manually (or ask me to update it) as work progresses.
 | 1 | Project setup, design system, base components, database | Done |
 | 2 | Navigation shell, Dashboard UI, Quick-Add UI | Done |
 | 3 | Ledger (transaction list, search, filter, swipe) | Core done — see open items below |
-| 4 | Transaction Detail & Edit Modal, Delete dialog | Not started |
-| 5 | Statistics screen (By Purpose / Category / Vendor) | Not started — stub route only |
-| 6 | Settings, Manage Purposes/Categories, Export/Backup | Not started — stub route only |
+| 4 | Transaction Detail & Edit Modal, Delete dialog | Done (UI) |
+| 5 | Statistics screen (By Purpose / Category / Vendor) | Done (UI) |
+| 6 | Settings, Manage Purposes/Categories, Export/Backup | In progress |
 | 7 | SQLite data layer — wire all screens to real data | **Not started — can begin now, see below** |
 | 8 | Toast/Snackbar system, error states, polish & testing | Not started |
 
@@ -50,15 +50,16 @@ Either works; nothing above is blocking the backend from starting today.
 - [x] Design System documented — `docs/DESIGN_SYSTEM.md`
 - [x] `theme/tokens.ts` — touch targets, icon sizes, spacing constants
 - [x] `types/models.ts` — shared `Transaction` / `Purpose` shapes (match `04_Data_Model.md`)
-- [x] Base UI components: `Button`, `Chip`, `Card`, `Amount`, `EmptyState`, `Skeleton`
+- [x] Base UI components: `Button` (added `muted` variant for neutral Cancel actions, distinct from `ghost`'s negative-text Delete styling), `Chip`, `Card`, `Amount`, `EmptyState`, `Skeleton`
 - [x] `GestureHandlerRootView` wired at root (needed for Ledger swipe actions)
+- [x] `data/sampleData.ts` — single shared sample dataset; Dashboard, Ledger, and Detail all import from it (previously duplicated per-screen)
 
 ---
 
 ### Navigation Shell
 - [x] Bottom Tab Navigator (Dashboard, Ledger, Stats, Settings) — all 4 routes now resolve
 - [x] Tab icons — Material Icons, active/inactive color states
-- [x] `app/_layout.tsx` root layout, modal routes registered (`quick-add`, `filter`)
+- [x] `app/_layout.tsx` root layout, modal routes registered (`quick-add`, `filter`, `transaction/[id]`)
 
 ---
 
@@ -87,31 +88,41 @@ Either works; nothing above is blocking the backend from starting today.
 - [x] Transaction row layout (icon, vendor, purpose badge, category, amount, time)
 - [x] Empty states (no transactions / no search or filter results)
 - [x] Swipe left — edit reveal; swipe right — delete reveal (`components/SwipeableTransactionRow.tsx`)
-- [x] Tap row → navigates to `/transaction/[id]` (route not created yet — Phase 4)
+- [x] Tap row → navigates to `/transaction/[id]` (now built)
+- [x] Swipe-left (edit) and swipe-right (delete) now route into the Detail screen, opening directly into Edit Mode or the Delete dialog
 - [ ] Filter Sheet selections don't persist back to the Ledger screen yet (no shared filter state)
 - [ ] Date Range filter (needs `@react-native-community/datetimepicker`, not yet a dependency)
-- [ ] Swipe-delete currently a no-op — needs Delete Confirmation Dialog (Phase 4)
 - [ ] **Wire to real SQLite data** (currently uses sample data)
 
 ---
 
-### Screen 4: Transaction Detail & Edit Modal — Not started
-- [ ] `/transaction/[id]` route (referenced by Ledger taps, does not exist yet)
-- [ ] View Mode, Edit Mode, edit-amount notice banner
-- [ ] Delete Confirmation Dialog
-- [ ] Undo toast after deletion
+### Screen 4: Transaction Detail & Edit Modal — Done (UI)
+- [x] `/transaction/[id].tsx` — View Mode: hero amount, type/vendor/purpose/category/note/created rows, Edit + Delete buttons
+- [x] Edit Mode — all fields editable, edit-amount notice banner when amount changes, Save (disabled until something actually changed) / Cancel
+- [x] Delete Confirmation Dialog — centered modal, states the amount and purpose pool it restores, Cancel / Delete (with loading state)
+- [x] Deep-linkable: `?edit=1` opens straight into Edit Mode, `?confirmDelete=1` opens straight to the delete dialog (used by Ledger's swipe actions)
+- [ ] Undo toast after deletion (needs the global Toast/Snackbar system — Phase 8)
+- [ ] **Wire Save/Delete to real SQLite** (currently local state only, mutates nothing persistent)
 
 ---
 
-### Screen 5: Statistics — Stub only
-- [x] Stub route at `app/(tabs)/stats.tsx` (prevents tab 404, no real content)
-- [ ] Everything else per spec
+### Screen 5: Statistics — Done (UI)
+- [x] Month selector ("< August 2026 >") — both arrows disabled since sample data spans one month; will un-disable naturally once real multi-month data exists
+- [x] Summary row (Received / Spent cards for the selected month)
+- [x] Sub-tab switcher: By Purpose / By Category / By Vendor, accent underline on active tab
+- [x] By Purpose view — purpose cards, net balance, received/spent, progress bar, "% spent" caption, sorted highest-spending first
+- [x] By Category view — ranked list (rank, name, amount, % of total, proportional bar)
+- [x] By Vendor view — same layout, plus transaction count per vendor
+- [x] Empty state for months with no data
+- [ ] **Wire month navigation and all three views to real SQLite queries** (currently computed from `data/sampleData.ts`)
 
 ---
 
-### Screen 6: Settings — Stub only
+### Screen 6: Settings — In progress
 - [x] Stub route at `app/(tabs)/settings.tsx` (prevents tab 404, no real content)
-- [ ] Everything else per spec, incl. Manage Purposes/Categories sub-screens
+- [x] `ManageTaxonomyScreen` component built (shared UI for Manage Purposes / Categories)
+- [ ] Wire taxonomy screen routes and implement Settings main screen UI
+- [ ] Export/Backup UI
 
 ---
 
@@ -151,11 +162,14 @@ Either works; nothing above is blocking the backend from starting today.
 | [theme/tokens.ts](../theme/tokens.ts) | Touch target, icon size, spacing constants |
 | [app/(tabs)/index.tsx](../app/(tabs)/index.tsx) | Dashboard screen |
 | [app/(tabs)/ledger.tsx](../app/(tabs)/ledger.tsx) | Ledger screen |
-| [app/(tabs)/stats.tsx](../app/(tabs)/stats.tsx) | Stats screen (stub) |
+| [app/(tabs)/stats.tsx](../app/(tabs)/stats.tsx) | Stats screen — By Purpose / Category / Vendor |
 | [app/(tabs)/settings.tsx](../app/(tabs)/settings.tsx) | Settings screen (stub) |
 | [app/quick-add.tsx](../app/quick-add.tsx) | Quick-Add modal screen |
 | [app/filter.tsx](../app/filter.tsx) | Ledger filter modal screen |
+| [app/transaction/\[id\].tsx](../app/transaction/%5Bid%5D.tsx) | Transaction Detail / Edit / Delete screen |
+| [data/sampleData.ts](../data/sampleData.ts) | Shared sample transactions/purposes used by all screens |
 | [components/SwipeableTransactionRow.tsx](../components/SwipeableTransactionRow.tsx) | Swipeable ledger row |
+| [components/ManageTaxonomyScreen.tsx](../components/ManageTaxonomyScreen.tsx) | Shared UI for Manage Purposes / Manage Categories |
 | [components/ui/](../components/ui/) | Reusable base UI components |
 
 ---
@@ -170,8 +184,8 @@ Either works; nothing above is blocking the backend from starting today.
 | 4 | Dashboard uses hardcoded sample data | `app/(tabs)/index.tsx` | High — blocked on data layer |
 | 5 | Ledger uses hardcoded sample data | `app/(tabs)/ledger.tsx` | High — blocked on data layer |
 | 6 | Filter Sheet selections don't flow back to Ledger | `app/filter.tsx`, `app/(tabs)/ledger.tsx` | Medium |
-| 7 | Ledger swipe-delete is a no-op (needs Phase 4 dialog) | `app/(tabs)/ledger.tsx` | Medium |
-| 8 | `/transaction/[id]` route doesn't exist yet | Phase 4 | High — next UI phase |
-| 9 | Date Range filter omitted (needs a date-picker dependency) | `app/filter.tsx` | Low |
-| 10 | Stats, Settings tab screens are stubs | `app/(tabs)/` | Phase 5–6 |
-| 11 | No Toast/Snackbar system yet | Global | Phase 8 |
+| 7 | Transaction Detail Save/Delete don't touch real data | `app/transaction/[id].tsx` | High — blocked on data layer |
+| 8 | Date Range filter omitted (needs a date-picker dependency) | `app/filter.tsx` | Low |
+| 9 | Stats view uses hardcoded sample data | `app/(tabs)/stats.tsx` | High — blocked on data layer |
+| 10 | Settings tab screen is a stub | `app/(tabs)/settings.tsx` | Phase 6 |
+| 11 | No Toast/Snackbar system yet (Undo-after-delete depends on it) | Global | Phase 8 |
