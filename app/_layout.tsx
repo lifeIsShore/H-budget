@@ -10,6 +10,8 @@ import { Stack } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ToastProvider } from "@/components/ToastProvider";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -32,22 +34,26 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" backgroundColor="#FAF9F6" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="quick-add"
-          options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
-        />
-        <Stack.Screen
-          name="filter"
-          options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
-        />
-        <Stack.Screen
-          name="transaction/[id]"
-          options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
-        />
-      </Stack>
+      <SafeAreaProvider>
+        <ToastProvider>
+          <StatusBar style="dark" backgroundColor="#FAF9F6" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="quick-add"
+              options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="filter"
+              options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="transaction/[id]"
+              options={{ presentation: "transparentModal", animation: "slide_from_bottom" }}
+            />
+          </Stack>
+        </ToastProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

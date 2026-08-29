@@ -1,8 +1,8 @@
 # H-Budget — Project Status
 
 **Last updated:** 2026-08-29
-**Current phase:** Phase 6 (Settings) in progress, or start backend now
-**Overall progress:** ~70% done
+**Current phase:** All 6 screens have real UI, global Toast/Snackbar system built — Phase 7 (backend/data layer) is the natural next step
+**Overall progress:** ~80% done
 
 Update this file manually (or ask me to update it) as work progresses.
 
@@ -17,28 +17,27 @@ Update this file manually (or ask me to update it) as work progresses.
 | 3 | Ledger (transaction list, search, filter, swipe) | Core done — see open items below |
 | 4 | Transaction Detail & Edit Modal, Delete dialog | Done (UI) |
 | 5 | Statistics screen (By Purpose / Category / Vendor) | Done (UI) |
-| 6 | Settings, Manage Purposes/Categories, Export/Backup | In progress |
+| 6 | Settings, Manage Purposes/Categories, Export/Backup | Done (UI) |
 | 7 | SQLite data layer — wire all screens to real data | **Not started — can begin now, see below** |
-| 8 | Toast/Snackbar system, error states, polish & testing | Not started |
+| 8 | Toast/Snackbar system, error states, polish & testing | Toast/Snackbar built; error states & device polish pass still open |
 
 ---
 
-## Can the backend start now?
+## All 6 screens now have real UI — start the backend
 
-**Yes.** The data layer (Phase 7) is independent of the remaining UI phases —
-it just needs the schema in `Expense Tracker/04_Data_Model.md` and the query
-list below. It does not need Phases 4–6 finished first. Two ways to sequence
-it from here:
+Every screen in the spec has a built, styled, stateful UI now (Dashboard,
+Quick-Add, Ledger, Transaction Detail/Edit, Statistics, Settings + its two
+sub-screens). None of it is wired to persistent data yet — everything reads
+from `data/sampleData.ts` or holds local component state that resets on
+reload. This is the natural point to start Phase 7:
 
-- **Backend now, UI continues in parallel** — start Phase 7 (SQLite schema,
-  migrations, CRUD, computed queries) while UI work continues on Phase 4
-  (Detail/Edit modal). Once both exist, the wiring step (replacing sample
-  data with real queries in Dashboard/Quick-Add/Ledger) is small.
-- **Finish all screens first, wire once at the end** — keep going through
-  Phase 4–6 UI, then do one wiring pass. Less context-switching, but nothing
-  is testable against real data until later.
+- Schema + migrations from `04_Data_Model.md`
+- Seed Purposes/Categories on first run
+- Transaction CRUD + the computed queries listed below
+- Then one wiring pass: swap each screen's `data/sampleData.ts` import /
+  fake-delay handler for a real query or mutation
 
-Either works; nothing above is blocking the backend from starting today.
+Nothing left in the UI blocks this — go ahead whenever you're ready.
 
 ---
 
@@ -52,19 +51,20 @@ Either works; nothing above is blocking the backend from starting today.
 - [x] `types/models.ts` — shared `Transaction` / `Purpose` shapes (match `04_Data_Model.md`)
 - [x] Base UI components: `Button` (added `muted` variant for neutral Cancel actions, distinct from `ghost`'s negative-text Delete styling), `Chip`, `Card`, `Amount`, `EmptyState`, `Skeleton`
 - [x] `GestureHandlerRootView` wired at root (needed for Ledger swipe actions)
-- [x] `data/sampleData.ts` — single shared sample dataset; Dashboard, Ledger, and Detail all import from it (previously duplicated per-screen)
+- [x] `data/sampleData.ts` — single shared sample dataset; every screen imports from it (previously duplicated per-screen)
 
 ---
 
 ### Navigation Shell
-- [x] Bottom Tab Navigator (Dashboard, Ledger, Stats, Settings) — all 4 routes now resolve
+- [x] Bottom Tab Navigator (Dashboard, Ledger, Stats, Settings) — all 4 routes resolve
 - [x] Tab icons — Material Icons, active/inactive color states
 - [x] `app/_layout.tsx` root layout, modal routes registered (`quick-add`, `filter`, `transaction/[id]`)
+- [x] `app/settings/` — plain pushed stack screens (not modals) for Manage Purposes / Categories, matching spec's "top app bar + back" pattern
 
 ---
 
 ### Screen 1: Dashboard — Done (UI)
-- [x] All sections built (see prior status entry for full breakdown)
+- [x] All sections built (hero balance, warning banner, purpose cards, recent activity, sticky action bar, loading/empty states)
 - [ ] **Wire to real SQLite data** (currently uses sample data)
 
 ---
@@ -88,8 +88,8 @@ Either works; nothing above is blocking the backend from starting today.
 - [x] Transaction row layout (icon, vendor, purpose badge, category, amount, time)
 - [x] Empty states (no transactions / no search or filter results)
 - [x] Swipe left — edit reveal; swipe right — delete reveal (`components/SwipeableTransactionRow.tsx`)
-- [x] Tap row → navigates to `/transaction/[id]` (now built)
-- [x] Swipe-left (edit) and swipe-right (delete) now route into the Detail screen, opening directly into Edit Mode or the Delete dialog
+- [x] Tap row → navigates to `/transaction/[id]`
+- [x] Swipe-left (edit) and swipe-right (delete) route into the Detail screen, opening directly into Edit Mode or the Delete dialog
 - [ ] Filter Sheet selections don't persist back to the Ledger screen yet (no shared filter state)
 - [ ] Date Range filter (needs `@react-native-community/datetimepicker`, not yet a dependency)
 - [ ] **Wire to real SQLite data** (currently uses sample data)
@@ -118,11 +118,15 @@ Either works; nothing above is blocking the backend from starting today.
 
 ---
 
-### Screen 6: Settings — In progress
-- [x] Stub route at `app/(tabs)/settings.tsx` (prevents tab 404, no real content)
-- [x] `ManageTaxonomyScreen` component built (shared UI for Manage Purposes / Categories)
-- [ ] Wire taxonomy screen routes and implement Settings main screen UI
-- [ ] Export/Backup UI
+### Screen 6: Settings — Done (UI)
+- [x] Account section — Opening Balance (tap → edit dialog), Currency (tap → selection sheet, EUR/USD/GBP/TRY/CHF)
+- [x] Customization section — Manage Purposes / Manage Categories rows push to sub-screens
+- [x] Data & Backup section — Export CSV, Backup JSON, Restore JSON (with destructive confirmation dialog)
+- [x] About section — App Version, non-tappable
+- [x] `app/settings/purposes.tsx` + `app/settings/categories.tsx` — shared `ManageTaxonomyScreen` component: edit inline, delete (disabled if last remaining or currently in use by a transaction), add with duplicate-name validation
+- [ ] Opening Balance / Currency are local state, not shared with Dashboard's hardcoded value yet (needs real app state — zustand is already a dependency, just not wired)
+- [ ] Export/Backup/Restore show a page-local demo confirmation strip, not a real file write — the *global*, reusable Toast/Snackbar (Phase 8) isn't built yet, this was a local stand-in, not a substitute for it
+- [ ] **Wire everything to real SQLite + expo-file-system/expo-sharing** (currently no persistence anywhere in Settings)
 
 ---
 
@@ -142,9 +146,12 @@ Either works; nothing above is blocking the backend from starting today.
 ---
 
 ### Global Systems
-- [ ] Toast / Snackbar component (auto-dismiss 3s, UNDO action for deletes)
-- [ ] Error validation messages (invalid amount, duplicate name, etc.)
-- [x] No-emoji icons verified (Material Icons only, all screens so far)
+- [x] Toast / Snackbar component (`components/ToastProvider.tsx`) — mounted once at root, `useToast().show(message, { actionLabel, onAction, tone, durationMs })`, auto-dismiss 3s default, negative tone for destructive actions
+- [x] Settings' Export/Backup/Restore confirmations now go through the real global toast (previously a page-local strip)
+- [x] Transaction Detail's delete now shows an Undo toast (`Deleted <vendor> — EUR <amount>`) — Undo is wired to the toast dismissing itself; it has nothing to actually reverse yet since delete doesn't touch real data (re-insert-on-undo becomes meaningful once Phase 7 exists)
+- [x] `SafeAreaProvider` now wraps the app root (was previously relying on implicit fallback insets — needed explicitly once the Toast reads `useSafeAreaInsets()`)
+- [ ] Error validation messages (invalid amount, duplicate name, etc.) — duplicate-name validation exists in Manage Purposes/Categories; broader validation messaging elsewhere not yet audited
+- [x] No-emoji icons verified (Material Icons only, all screens)
 - [ ] Keyboard-avoidance tested on Android device
 - [ ] All touch targets verified >= 48dp on device
 - [ ] Quick-Add speed test: entry to save in < 5 seconds
@@ -163,13 +170,16 @@ Either works; nothing above is blocking the backend from starting today.
 | [app/(tabs)/index.tsx](../app/(tabs)/index.tsx) | Dashboard screen |
 | [app/(tabs)/ledger.tsx](../app/(tabs)/ledger.tsx) | Ledger screen |
 | [app/(tabs)/stats.tsx](../app/(tabs)/stats.tsx) | Stats screen — By Purpose / Category / Vendor |
-| [app/(tabs)/settings.tsx](../app/(tabs)/settings.tsx) | Settings screen (stub) |
+| [app/(tabs)/settings.tsx](../app/(tabs)/settings.tsx) | Settings screen — Account / Customization / Data & Backup / About |
+| [app/settings/purposes.tsx](../app/settings/purposes.tsx) | Manage Purposes sub-screen |
+| [app/settings/categories.tsx](../app/settings/categories.tsx) | Manage Categories sub-screen |
 | [app/quick-add.tsx](../app/quick-add.tsx) | Quick-Add modal screen |
 | [app/filter.tsx](../app/filter.tsx) | Ledger filter modal screen |
 | [app/transaction/\[id\].tsx](../app/transaction/%5Bid%5D.tsx) | Transaction Detail / Edit / Delete screen |
 | [data/sampleData.ts](../data/sampleData.ts) | Shared sample transactions/purposes used by all screens |
 | [components/SwipeableTransactionRow.tsx](../components/SwipeableTransactionRow.tsx) | Swipeable ledger row |
-| [components/ManageTaxonomyScreen.tsx](../components/ManageTaxonomyScreen.tsx) | Shared UI for Manage Purposes / Manage Categories |
+| [components/ManageTaxonomyScreen.tsx](../components/ManageTaxonomyScreen.tsx) | Shared edit/delete/add list, used by both Manage Purposes/Categories |
+| [components/ToastProvider.tsx](../components/ToastProvider.tsx) | Global Toast/Snackbar — `useToast()` hook, mounted once in `app/_layout.tsx` |
 | [components/ui/](../components/ui/) | Reusable base UI components |
 
 ---
@@ -187,5 +197,6 @@ Either works; nothing above is blocking the backend from starting today.
 | 7 | Transaction Detail Save/Delete don't touch real data | `app/transaction/[id].tsx` | High — blocked on data layer |
 | 8 | Date Range filter omitted (needs a date-picker dependency) | `app/filter.tsx` | Low |
 | 9 | Stats view uses hardcoded sample data | `app/(tabs)/stats.tsx` | High — blocked on data layer |
-| 10 | Settings tab screen is a stub | `app/(tabs)/settings.tsx` | Phase 6 |
-| 11 | No Toast/Snackbar system yet (Undo-after-delete depends on it) | Global | Phase 8 |
+| 10 | Settings has no persistence anywhere (balance, currency, purposes, categories, export/backup/restore) | `app/(tabs)/settings.tsx`, `app/settings/` | High — blocked on data layer |
+| 11 | Undo (Transaction Detail delete toast) doesn't reverse anything yet — needs real delete to undo | `app/transaction/[id].tsx` | High — blocked on data layer |
+| 12 | Device-level polish pass not done (keyboard avoidance, touch target audit, Quick-Add speed test) | Global | Medium — needs a physical/emulator test pass |

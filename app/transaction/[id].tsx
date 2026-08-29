@@ -15,21 +15,25 @@ import { Amount } from "@/components/ui/Amount";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ToastProvider";
 import { sampleTransactions } from "@/data/sampleData";
 
 /**
  * UI-only — View Mode, Edit Mode, and Delete Confirmation per
  * 05_UI_UX_Specification.md Screen 4. Save/Delete are not wired to SQLite
  * yet (Phase 7); this screen mutates nothing, it only demonstrates the
- * full interaction. Open directly into Edit Mode via ?edit=1, or straight
- * to the delete dialog via ?confirmDelete=1 (both set by Ledger's swipe
- * actions).
+ * full interaction, including the Undo toast on delete (Phase 8's global
+ * Toast, wired here — tapping Undo currently just dismisses the toast,
+ * since there's no real delete underneath it to reverse yet). Open
+ * directly into Edit Mode via ?edit=1, or straight to the delete dialog
+ * via ?confirmDelete=1 (both set by Ledger's swipe actions).
  */
 
 const purposes = ["University", "High School", "General"];
 const categories = ["Travel", "Food", "Equipment", "Software", "Other"];
 
 export default function TransactionDetail() {
+  const toast = useToast();
   const { id, edit, confirmDelete } = useLocalSearchParams<{
     id: string;
     edit?: string;
@@ -62,7 +66,6 @@ export default function TransactionDetail() {
   }
 
   const isExpense = original.amount < 0;
-  const isIncome = !isExpense;
   const numericAmount = parseFloat(amountText) || 0;
   const signedNewAmount = isExpense ? -numericAmount : numericAmount;
   const amountChanged = signedNewAmount !== original.amount;
@@ -79,10 +82,15 @@ export default function TransactionDetail() {
 
   function handleDelete() {
     setDeleting(true);
-    // TODO: DELETE from SQLite, show Undo toast, then close (Phase 7 + 8).
+    // TODO: DELETE from SQLite (Phase 7). Undo currently has nothing to
+    // reverse — once real deletes exist, Undo should re-insert the row.
     setTimeout(() => {
       setDeleting(false);
       close();
+      toast.show(
+        `Deleted ${original.vendor ?? "transaction"} — EUR ${Math.abs(original.amount).toFixed(2)}`,
+        { actionLabel: "Undo", tone: "negative", onAction: () => {} },
+      );
     }, 400);
   }
 
