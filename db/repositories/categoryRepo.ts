@@ -6,7 +6,7 @@
  */
 
 import { getDb } from "@/db/database";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ export async function isCategoryInUse(id: string): Promise<boolean> {
 // ─── write ────────────────────────────────────────────────────────────────────
 
 export async function insertCategory(name: string): Promise<CategoryRow> {
-  const id = uuidv4();
+  const id = Crypto.randomUUID();
   const now = new Date().toISOString();
   const sortOrder = await nextSortOrder();
   await getDb().runAsync(

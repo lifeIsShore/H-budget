@@ -15,7 +15,7 @@
  */
 
 import * as SQLite from "expo-sqlite";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 
 // ─── singleton ────────────────────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ async function seedIfFirstRun(db: SQLite.SQLiteDatabase): Promise<void> {
     await db.runAsync(
       `INSERT OR IGNORE INTO purposes (id, name, sort_order, is_active, created_at)
        VALUES (?, ?, ?, 1, ?)`,
-      [uuidv4(), DEFAULT_PURPOSES[i], i, now]
+      [Crypto.randomUUID(), DEFAULT_PURPOSES[i], i, now]
     );
   }
 
@@ -139,7 +139,7 @@ async function seedIfFirstRun(db: SQLite.SQLiteDatabase): Promise<void> {
     await db.runAsync(
       `INSERT OR IGNORE INTO categories (id, name, sort_order, is_active, created_at)
        VALUES (?, ?, ?, 1, ?)`,
-      [uuidv4(), DEFAULT_CATEGORIES[i], i, now]
+      [Crypto.randomUUID(), DEFAULT_CATEGORIES[i], i, now]
     );
   }
 

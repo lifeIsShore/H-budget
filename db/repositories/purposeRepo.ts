@@ -7,7 +7,7 @@
  */
 
 import { getDb } from "@/db/database";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +63,16 @@ export async function getPurposesWithBalances(): Promise<PurposeWithBalance[]> {
     ORDER BY p.sort_order ASC, p.name ASC
   `);
 
-  return rows.map((r) => ({
+  return rows.map((r: {
+    id: string;
+    name: string;
+    color: string | null;
+    sort_order: number;
+    is_active: number;
+    created_at: string;
+    received_cents: number;
+    spent_cents: number;
+  }) => ({
     ...mapRow(r),
     receivedCents: r.received_cents,
     spentCents: r.spent_cents,
@@ -105,7 +114,7 @@ export async function activePurposeCount(): Promise<number> {
 // ─── write ────────────────────────────────────────────────────────────────────
 
 export async function insertPurpose(name: string): Promise<PurposeRow> {
-  const id = uuidv4();
+  const id = Crypto.randomUUID();
   const now = new Date().toISOString();
   const sortOrder = await nextSortOrder("purposes");
   await getDb().runAsync(

@@ -11,7 +11,7 @@
  */
 
 import { getDb } from "@/db/database";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ export async function getVendorSuggestions(prefix: string): Promise<string[]> {
      LIMIT 8`,
     [`${prefix.trim()}%`]
   );
-  return rows.map((r) => r.vendor);
+  return rows.map((r: { vendor: string }) => r.vendor);
 }
 
 export async function getUnassignedCount(): Promise<number> {
@@ -165,7 +165,7 @@ export async function getUnassignedCount(): Promise<number> {
 export async function insertTransaction(
   data: InsertTransactionInput
 ): Promise<TransactionUI> {
-  const id = uuidv4();
+  const id = Crypto.randomUUID();
   const now = new Date().toISOString();
 
   await getDb().runAsync(
@@ -282,7 +282,7 @@ async function writeAuditLog(entry: {
     `INSERT INTO audit_log (id, transaction_id, action, previous_state, new_state, changed_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
-      uuidv4(),
+      Crypto.randomUUID(),
       entry.transactionId,
       entry.action,
       entry.previousState ? JSON.stringify(entry.previousState) : null,

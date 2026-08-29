@@ -48,7 +48,7 @@ export async function exportCsv(): Promise<string> {
     return s;
   };
 
-  const lines = rows.map((r) =>
+  const lines = rows.map((r: any) =>
     [r.id, r.type, r.amount, r.date, r.vendor, r.purpose_name, r.category_name, r.note, r.created_at]
       .map(escapeCell)
       .join(",")
@@ -145,7 +145,7 @@ export async function importJson(jsonString: string): Promise<void> {
     await db.runAsync(
       `INSERT OR IGNORE INTO purposes (id, name, color, sort_order, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [r.id, r.name, r.color ?? null, r.sort_order ?? 0, r.is_active ?? 1, r.created_at]
+      [r.id, r.name, r.color ?? null, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
     );
   }
 
@@ -155,7 +155,7 @@ export async function importJson(jsonString: string): Promise<void> {
     await db.runAsync(
       `INSERT OR IGNORE INTO categories (id, name, sort_order, is_active, created_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [r.id, r.name, r.sort_order ?? 0, r.is_active ?? 1, r.created_at]
+      [r.id, r.name, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
     );
   }
 
@@ -170,7 +170,7 @@ export async function importJson(jsonString: string): Promise<void> {
         r.id, r.type, r.amount, r.date,
         r.vendor ?? null, r.purpose_id ?? null, r.category_id ?? null,
         r.note ?? null, r.created_at, r.updated_at ?? r.created_at,
-      ]
+      ] as any[]
     );
   }
 }
