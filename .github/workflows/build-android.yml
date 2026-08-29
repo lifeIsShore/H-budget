@@ -30,6 +30,7 @@ jobs:
 
       - name: Build Release APK
         run: |
+          npx expo prebuild --platform android
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
