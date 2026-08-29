@@ -1,56 +1,93 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, TextInput, Pressable, SectionList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { SwipeableTransactionRow } from "@/components/SwipeableTransactionRow";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { sampleTransactions } from "@/data/sampleData";
+import { useTransactions } from "@/hooks/useTransactions";
+import { useFilterStore } from "@/stores/filterStore";
+import type { TransactionUI } from "@/db/repositories/transactionRepo";
 
 /**
- * UI-only, sample data (data/sampleData.ts) — shapes match 04_Data_Model.md
- * so wiring real SQLite queries later is a drop-in. Filter Sheet selections
- * don't persist back here yet (no shared filter state / router params).
+ * Ledger screen — wired to real SQLite data.
+ * Active filters come from the shared Zustand filterStore (written by filter.tsx).
+ * The deep-link param ?filter=unassigned (from the Dashboard warning banner) is
+ * still supported and sets unassignedOnly in the store on mount.
  */
-
-// Toggle while building — remove once wired to real data.
-const DEMO_STATE: "loaded" | "empty" = "loaded";
 
 export default function Ledger() {
   const { filter } = useLocalSearchParams<{ filter?: string }>();
+  const { filters, setFilters, hasActiveFilters, resetFilters } = useFilterStore();
   const [query, setQuery] = useState("");
-  const [showUnassignedOnly] = useState(filter === "unassigned");
 
+  // Handle the Dashboard's "unassigned" deep-link: set filter on mount
+  useFocusEffect(
+    useCallback(() => {
+      if (filter === "unassigned") {
+        setFilters({ unassignedOnly: true });
+      }
+    }, [filter, setFilters])
+  );
+
+  // Build the DB filter from the store (search is handled client-side on the loaded list)
+  const dbFilters = useMemo(
+    () => ({
+      type: filters.type ?? undefined,
+      unassignedOnly: filters.unassignedOnly,
+      purposeId: filters.purposeId ?? undefined,
+      categoryId: filters.categoryId ?? undefined,
+      dateFrom: filters.dateFrom ?? undefined,
+      dateTo: filters.dateTo ?? undefined,
+    }),
+    [filters]
+  );
+
+  const { transactions, reload } = useTransactions(dbFilters);
+
+  // Reload on every focus so the list stays fresh after edits/deletes
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
+
+  // Client-side text search on vendor, category name, and amount
   const filtered = useMemo(() => {
-    let list = DEMO_STATE === "empty" ? [] : sampleTransactions;
-    if (showUnassignedOnly) list = list.filter((t) => !t.purpose);
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.vendor?.toLowerCase().includes(q) ||
-          t.category?.toLowerCase().includes(q) ||
-          String(Math.abs(t.amount)).includes(q),
-      );
-    }
-    return list;
-  }, [query, showUnassignedOnly]);
+    if (!query.trim()) return transactions;
+    const q = query.trim().toLowerCase();
+    return transactions.filter(
+      (t) =>
+        t.vendor?.toLowerCase().includes(q) ||
+        t.categoryName?.toLowerCase().includes(q) ||
+        t.purposeName?.toLowerCase().includes(q) ||
+        String(Math.abs(t.amount)).includes(q)
+    );
+  }, [transactions, query]);
 
+  // Group by ISO date for section list
   const sections = useMemo(() => {
-    const groups = new Map<string, typeof filtered>();
+    const groups = new Map<string, TransactionUI[]>();
     for (const t of filtered) {
       const arr = groups.get(t.date) ?? [];
       arr.push(t);
       groups.set(t.date, arr);
     }
     return Array.from(groups.entries()).map(([date, data]) => ({
-      title: date,
+      title: formatSectionDate(date),
       total: data.reduce((s, t) => s + t.amount, 0),
       data,
     }));
   }, [filtered]);
 
-  const hasActiveFilters = showUnassignedOnly;
+  // Active filter chip labels
+  const filterLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (filters.type) labels.push(filters.type.charAt(0).toUpperCase() + filters.type.slice(1));
+    if (filters.unassignedOnly) labels.push("Unassigned only");
+    if (filters.dateFrom || filters.dateTo) {
+      const from = filters.dateFrom ? formatShortDate(filters.dateFrom) : "—";
+      const to = filters.dateTo ? formatShortDate(filters.dateTo) : "—";
+      labels.push(`${from} → ${to}`);
+    }
+    return labels;
+  }, [filters]);
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
@@ -64,7 +101,7 @@ export default function Ledger() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search vendor, note, or amount..."
+            placeholder="Search vendor, category, or amount..."
             placeholderTextColor="#A39D8E"
             className="flex-1 font-sans text-[13.5px] text-ink ml-2"
           />
@@ -81,13 +118,15 @@ export default function Ledger() {
         </Pressable>
       </View>
 
-      {/* Active filter bar */}
-      {hasActiveFilters && (
-        <View className="flex-row items-center px-4 pb-2 gap-2">
-          <View className="bg-brand-subtle px-2.5 py-1 rounded-full flex-row items-center gap-1">
-            <Text className="font-sans-medium text-[11.5px] text-brand">Unassigned only</Text>
-          </View>
-          <Pressable onPress={() => router.setParams({ filter: undefined })} hitSlop={8}>
+      {/* Active filter chip bar */}
+      {(hasActiveFilters || filterLabels.length > 0) && (
+        <View className="flex-row items-center px-4 pb-2 gap-2 flex-wrap">
+          {filterLabels.map((label) => (
+            <View key={label} className="bg-brand-subtle px-2.5 py-1 rounded-full flex-row items-center gap-1">
+              <Text className="font-sans-medium text-[11.5px] text-brand">{label}</Text>
+            </View>
+          ))}
+          <Pressable onPress={resetFilters} hitSlop={8}>
             <Text className="font-sans-medium text-[11.5px] text-negative">Clear All</Text>
           </Pressable>
         </View>
@@ -131,13 +170,50 @@ export default function Ledger() {
           renderItem={({ item }) => (
             <SwipeableTransactionRow
               transaction={item}
-              onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id } })}
-              onEdit={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id, edit: "1" } })}
-              onDelete={() => router.push({ pathname: "/transaction/[id]", params: { id: item.id, confirmDelete: "1" } })}
+              onPress={() =>
+                router.push({ pathname: "/transaction/[id]", params: { id: item.id } })
+              }
+              onEdit={() =>
+                router.push({
+                  pathname: "/transaction/[id]",
+                  params: { id: item.id, edit: "1" },
+                })
+              }
+              onDelete={() =>
+                router.push({
+                  pathname: "/transaction/[id]",
+                  params: { id: item.id, confirmDelete: "1" },
+                })
+              }
             />
           )}
         />
       )}
     </SafeAreaView>
   );
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function formatSectionDate(isoDate: string): string {
+  const d = new Date(isoDate + "T00:00:00");
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-IE", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(isoDate: string): string {
+  return new Date(isoDate + "T00:00:00").toLocaleDateString("en-IE", {
+    month: "short",
+    day: "numeric",
+  });
 }

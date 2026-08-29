@@ -12,6 +12,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/components/ToastProvider";
+import { useDb } from "@/hooks/useDb";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,11 +21,12 @@ export default function RootLayout() {
     IBMPlexSans_600SemiBold,
     IBMPlexMono_500Medium,
   });
+  const { dbReady } = useDb();
 
-  if (!fontsLoaded) {
-    // Deliberately not a branded splash — this is an internal tool, per
-    // 05_UI_UX_Specification.md: "no need for decorative onboarding or
-    // splash screens." A plain spinner on the paper background is correct.
+  // Wait for both fonts and SQLite before rendering anything. The DB init
+  // runs the schema migration and seeds defaults on first launch — must
+  // complete before any screen can query data.
+  if (!fontsLoaded || !dbReady) {
     return (
       <View className="flex-1 items-center justify-center bg-bg">
         <ActivityIndicator color="#22211F" />

@@ -1,12 +1,27 @@
+import { usePurposes } from "@/hooks/usePurposes";
+import { useTransactions } from "@/hooks/useTransactions";
 import { ManageTaxonomyScreen } from "@/components/ManageTaxonomyScreen";
-import { samplePurposes, sampleTransactions } from "@/data/sampleData";
 
 export default function ManagePurposes() {
-  const items = samplePurposes.map((p) => ({
+  const { purposes, loading, add, edit, remove } = usePurposes();
+  const { transactions } = useTransactions();
+
+  const items = purposes.map((p) => ({
     id: p.id,
     name: p.name,
-    usageCount: sampleTransactions.filter((t) => t.purpose === p.name).length,
+    // Count real transactions referencing this purpose
+    usageCount: transactions.filter((t) => t.purposeId === p.id).length,
   }));
 
-  return <ManageTaxonomyScreen title="Manage Purposes" initialItems={items} singularLabel="purpose" />;
+  return (
+    <ManageTaxonomyScreen
+      title="Manage Purposes"
+      items={items}
+      singularLabel="purpose"
+      loading={loading}
+      onAdd={add}
+      onEdit={edit}
+      onDelete={remove}
+    />
+  );
 }

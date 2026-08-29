@@ -1,39 +1,54 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Amount } from "@/components/ui/Amount";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
-import { sampleTransactions, samplePurposes } from "@/data/sampleData";
-import type { Transaction, Purpose } from "@/types/models";
+import { useTransactions, useUnassignedCount } from "@/hooks/useTransactions";
+import { usePurposesWithBalances } from "@/hooks/usePurposes";
+import { useSettings } from "@/hooks/useSettings";
+import type { TransactionUI } from "@/db/repositories/transactionRepo";
+import type { PurposeWithBalance } from "@/db/repositories/purposeRepo";
 
 /**
- * UI-only screen — wired to sample data, not the SQLite layer yet (that's
- * the backend side of this project). Shapes match 04_Data_Model.md and
- * 03_Features.md section 1 so wiring later is a drop-in of real queries
- * in place of data/sampleData.ts.
+ * Dashboard — wired to real SQLite data.
+ * Reloads on every focus so it stays fresh after Quick-Add inserts.
  */
 
-// Toggle these to preview states while building — remove once wired to real data.
-const DEMO_STATE: "loaded" | "loading" | "empty" = "loaded";
-
 export default function Dashboard() {
-  const [transactions] = useState(DEMO_STATE === "empty" ? [] : sampleTransactions);
-  const [purposes] = useState(DEMO_STATE === "empty" ? [] : samplePurposes);
+  const { transactions, loading: txLoading, reload: reloadTx } = useTransactions({ limit: 6 });
+  const { purposes, loading: purposeLoading, reload: reloadPurposes } = usePurposesWithBalances();
+  const { count: unassignedCount, reload: reloadUnassigned } = useUnassignedCount();
+  const { openingBalanceEuros, currency } = useSettings();
 
-  const { received, spent, balance, unassignedCount } = useMemo(() => {
-    const received = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-    const spent = Math.abs(transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0));
-    const openingBalance = 3000;
-    const unassignedCount = transactions.filter((t) => !t.purpose).length;
-    return { received, spent, balance: openingBalance + received - spent, unassignedCount };
-  }, [transactions]);
+  // Reload data every time the tab gains focus (e.g. after Quick-Add)
+  useFocusEffect(
+    useCallback(() => {
+      reloadTx();
+      reloadPurposes();
+      reloadUnassigned();
+    }, [reloadTx, reloadPurposes, reloadUnassigned])
+  );
 
-  if (DEMO_STATE === "loading") {
+  const loading = txLoading || purposeLoading;
+
+  const { received, spent, balance } = useMemo(() => {
+    const openingCents = (openingBalanceEuros ?? 0) * 100;
+    const receivedCents = purposes.reduce((s, p) => s + p.receivedCents, 0);
+    const spentCents = purposes.reduce((s, p) => s + p.spentCents, 0);
+    return {
+      received: receivedCents / 100,
+      spent: spentCents / 100,
+      balance: (openingCents + receivedCents - spentCents) / 100,
+    };
+  }, [purposes, openingBalanceEuros]);
+
+  if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
         <TopBar unassignedCount={0} />
@@ -51,7 +66,13 @@ export default function Dashboard() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <HeroBalanceCard balance={balance} received={received} spent={spent} openingBalance={3000} />
+        <HeroBalanceCard
+          balance={balance}
+          received={received}
+          spent={spent}
+          openingBalance={openingBalanceEuros ?? 0}
+          currency={currency}
+        />
 
         {unassignedCount > 0 && <WarningBanner count={unassignedCount} />}
 
@@ -84,7 +105,7 @@ export default function Dashboard() {
             />
           ) : (
             <View className="gap-2">
-              {transactions.slice(0, 6).map((t) => (
+              {transactions.map((t) => (
                 <TransactionRow key={t.id} transaction={t} />
               ))}
             </View>
@@ -122,11 +143,13 @@ function HeroBalanceCard({
   received,
   spent,
   openingBalance,
+  currency,
 }: {
   balance: number;
   received: number;
   spent: number;
   openingBalance: number;
+  currency: string;
 }) {
   return (
     <View className="mx-4 mt-4 bg-surface border border-border rounded-card p-5">
@@ -144,7 +167,8 @@ function HeroBalanceCard({
 
       <View className="h-px bg-border my-3" />
       <Text className="font-mono text-[12px] text-ink-faint">
-        Opening Balance: EUR {openingBalance.toLocaleString("en-IE", { minimumFractionDigits: 2 })}
+        Opening Balance: {currency}{" "}
+        {openingBalance.toLocaleString("en-IE", { minimumFractionDigits: 2 })}
       </Text>
     </View>
   );
@@ -165,19 +189,26 @@ function WarningBanner({ count }: { count: number }) {
   );
 }
 
-function PurposeCard({ purpose }: { purpose: Purpose }) {
-  const remaining = purpose.received - purpose.spent;
-  const pctSpent = purpose.received > 0 ? Math.min(purpose.spent / purpose.received, 1) : 0;
+function PurposeCard({ purpose }: { purpose: PurposeWithBalance }) {
+  const received = purpose.receivedCents / 100;
+  const spent = purpose.spentCents / 100;
+  const remaining = received - spent;
+  const pctSpent = received > 0 ? Math.min(spent / received, 1) : 0;
 
   return (
     <Card className="flex-1 min-w-[45%]">
       <Text className="font-sans-medium text-[14px] text-ink mb-2">{purpose.name}</Text>
       <View className="gap-0.5">
-        <Amount value={purpose.received} size="row" className="text-[13px]" />
-        <Amount value={-purpose.spent} size="row" className="text-[13px]" />
+        <Amount value={received} size="row" className="text-[13px]" />
+        <Amount value={-spent} size="row" className="text-[13px]" />
       </View>
       <View className="h-px bg-border my-2.5" />
-      <Amount value={remaining} size="row" signed={false} className={remaining >= 0 ? "text-ink" : "text-negative"} />
+      <Amount
+        value={remaining}
+        size="row"
+        signed={false}
+        className={remaining >= 0 ? "text-ink" : "text-negative"}
+      />
       <View className="h-1 bg-surface-alt rounded-full mt-2.5 overflow-hidden">
         <View
           className={`h-full rounded-full ${pctSpent >= 1 ? "bg-negative" : "bg-brand"}`}
@@ -188,11 +219,19 @@ function PurposeCard({ purpose }: { purpose: Purpose }) {
   );
 }
 
-function TransactionRow({ transaction }: { transaction: Transaction }) {
-  const isExpense = transaction.amount < 0;
+function TransactionRow({ transaction }: { transaction: TransactionUI }) {
+  const isExpense = transaction.type === "expense";
+  // Format ISO date as a short label for display
+  const dateLabel = new Date(transaction.date + "T00:00:00").toLocaleDateString("en-IE", {
+    month: "short",
+    day: "numeric",
+  });
+
   return (
     <Pressable
-      onPress={() => router.push({ pathname: "/transaction/[id]", params: { id: transaction.id } })}
+      onPress={() =>
+        router.push({ pathname: "/transaction/[id]", params: { id: transaction.id } })
+      }
       className="flex-row items-center bg-surface border border-border rounded-card px-3.5 active:opacity-70"
       style={{ minHeight: 64 }}
     >
@@ -210,29 +249,33 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
 
       <View className="flex-1 py-2.5">
         <Text
-          className={`font-sans-medium text-[14px] ${transaction.vendor ? "text-ink" : "text-ink-faint italic"}`}
+          className={`font-sans-medium text-[14px] ${
+            transaction.vendor ? "text-ink" : "text-ink-faint italic"
+          }`}
         >
           {transaction.vendor ?? "No vendor"}
         </Text>
         <View className="flex-row items-center gap-1.5 mt-0.5">
-          {transaction.purpose ? (
+          {transaction.purposeName ? (
             <View className="bg-surface-alt px-1.5 py-0.5 rounded">
-              <Text className="font-sans text-[10.5px] text-ink-muted">{transaction.purpose}</Text>
+              <Text className="font-sans text-[10.5px] text-ink-muted">
+                {transaction.purposeName}
+              </Text>
             </View>
           ) : (
             <View className="bg-warning-subtle px-1.5 py-0.5 rounded">
               <Text className="font-sans text-[10.5px] text-warning">Unassigned</Text>
             </View>
           )}
-          {transaction.category && (
-            <Text className="font-sans text-[11px] text-ink-muted">{transaction.category}</Text>
+          {transaction.categoryName && (
+            <Text className="font-sans text-[11px] text-ink-muted">{transaction.categoryName}</Text>
           )}
         </View>
       </View>
 
       <View className="items-end">
         <Amount value={transaction.amount} size="row" />
-        <Text className="font-sans text-[10px] text-ink-faint mt-0.5">{transaction.date}</Text>
+        <Text className="font-sans text-[10px] text-ink-faint mt-0.5">{dateLabel}</Text>
       </View>
     </Pressable>
   );

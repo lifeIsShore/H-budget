@@ -1,8 +1,8 @@
 # H-Budget — Project Status
 
 **Last updated:** 2026-08-29
-**Current phase:** All UI-only work complete (screens, Toast system, date picker, vendor autocomplete, date-range filter) — remaining items are genuinely blocked on Phase 7 (backend/data layer)
-**Overall progress:** ~85% done
+**Current phase:** Phase 7 complete — SQLite data layer fully wired to all screens
+**Overall progress:** ~95% done
 
 Update this file manually (or ask me to update it) as work progresses.
 
@@ -14,33 +14,31 @@ Update this file manually (or ask me to update it) as work progresses.
 | :--- | :--- | :--- |
 | 1 | Project setup, design system, base components, database | Done |
 | 2 | Navigation shell, Dashboard UI, Quick-Add UI | Done |
-| 3 | Ledger (transaction list, search, filter, swipe) | Core done — see open items below |
-| 4 | Transaction Detail & Edit Modal, Delete dialog | Done (UI) |
-| 5 | Statistics screen (By Purpose / Category / Vendor) | Done (UI) |
-| 6 | Settings, Manage Purposes/Categories, Export/Backup | Done (UI) |
-| 7 | SQLite data layer — wire all screens to real data | **Not started — can begin now, see below** |
-| 8 | Toast/Snackbar system, error states, polish & testing | Toast/Snackbar built; error states & device polish pass still open |
+| 3 | Ledger (transaction list, search, filter, swipe) | Done |
+| 4 | Transaction Detail & Edit Modal, Delete dialog | Done |
+| 5 | Statistics screen (By Purpose / Category / Vendor) | Done |
+| 6 | Settings, Manage Purposes/Categories, Export/Backup | Done |
+| 7 | SQLite data layer — wire all screens to real data | **Done** |
+| 8 | Toast/Snackbar system, error states, polish & testing | Toast/Snackbar built; device polish pass still open |
 
 ---
 
-## All UI-only work is done — the backend is the only thing left blocking progress
+## Phase 7 is complete — the app is now fully wired to SQLite
 
-Every screen in the spec has a built, styled, stateful UI (Dashboard,
-Quick-Add, Ledger, Transaction Detail/Edit, Statistics, Settings + its two
-sub-screens), the global Toast/Snackbar system is wired in, and the three
-remaining UI-only TODOs (date picker, vendor autocomplete, date-range
-filter) are now closed. Nothing left in `docs/PROJECT_STATUS.md`'s open
-items can move without Phase 7 — every remaining checkbox reads "wire to
-real SQLite" or depends on something that does. This is the point to
-start the data layer:
+Every screen reads and writes real persistent data:
 
-- Schema + migrations from `04_Data_Model.md`
-- Seed Purposes/Categories on first run
-- Transaction CRUD + the computed queries listed below
-- Then one wiring pass: swap each screen's `data/sampleData.ts` import /
-  fake-delay handler for a real query or mutation
+- `db/database.ts` — schema migration + first-run seed
+- `db/repositories/` — transactionRepo, purposeRepo, categoryRepo, settingsRepo, statsRepo, backupRepo
+- `hooks/` — useDb, useTransactions, usePurposes, useCategories, useSettings, useStats, useVendorSuggestions
+- `stores/filterStore.ts` — Zustand filter state shared between Filter Sheet and Ledger
+- All screens wired: Dashboard, Quick-Add, Ledger, Filter, Transaction Detail, Statistics, Settings, Manage Purposes/Categories
+- Export CSV, Backup JSON, and Restore JSON wired to expo-file-system + expo-sharing + expo-document-picker
+- `data/sampleData.ts` deleted — no longer needed
 
-Go ahead whenever you're ready — I'll do the wiring pass once it exists.
+Remaining items:
+- Device-level polish pass (keyboard avoidance, touch target audit on device)
+- Quick-Add speed test on device/emulator
+- Broader error validation message audit
 
 ---
 

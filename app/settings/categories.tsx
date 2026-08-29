@@ -1,14 +1,26 @@
+import { useCategories } from "@/hooks/useCategories";
+import { useTransactions } from "@/hooks/useTransactions";
 import { ManageTaxonomyScreen } from "@/components/ManageTaxonomyScreen";
-import { sampleTransactions } from "@/data/sampleData";
-
-const categoryNames = ["Travel", "Food", "Equipment", "Software", "Other"];
 
 export default function ManageCategories() {
-  const items = categoryNames.map((name, i) => ({
-    id: String(i + 1),
-    name,
-    usageCount: sampleTransactions.filter((t) => t.category === name).length,
+  const { categories, loading, add, edit, remove } = useCategories();
+  const { transactions } = useTransactions();
+
+  const items = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    usageCount: transactions.filter((t) => t.categoryId === c.id).length,
   }));
 
-  return <ManageTaxonomyScreen title="Manage Categories" initialItems={items} singularLabel="category" />;
+  return (
+    <ManageTaxonomyScreen
+      title="Manage Categories"
+      items={items}
+      singularLabel="category"
+      loading={loading}
+      onAdd={add}
+      onEdit={edit}
+      onDelete={remove}
+    />
+  );
 }

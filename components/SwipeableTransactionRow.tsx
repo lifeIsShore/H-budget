@@ -3,7 +3,7 @@ import { View, Text, Pressable, Animated } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Amount } from "@/components/ui/Amount";
-import type { Transaction } from "@/types/models";
+import type { TransactionUI } from "@/db/repositories/transactionRepo";
 
 /**
  * Swipe left → delete reveal (negative). Swipe right → edit reveal (brand,
@@ -16,13 +16,13 @@ export function SwipeableTransactionRow({
   onEdit,
   onDelete,
 }: {
-  transaction: Transaction;
+  transaction: TransactionUI;
   onPress?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
-  const isExpense = transaction.amount < 0;
+  const isExpense = transaction.type === "expense";
 
   return (
     <Swipeable
@@ -81,10 +81,10 @@ export function SwipeableTransactionRow({
             {transaction.vendor ?? "No vendor"}
           </Text>
           <View className="flex-row items-center gap-1.5 mt-0.5">
-            {transaction.purpose ? (
+            {transaction.purposeName ? (
               <View className="bg-surface-alt px-1.5 py-0.5 rounded">
                 <Text className="font-sans text-[10.5px] text-ink-muted">
-                  {transaction.purpose}
+                  {transaction.purposeName}
                 </Text>
               </View>
             ) : (
@@ -92,9 +92,9 @@ export function SwipeableTransactionRow({
                 <Text className="font-sans text-[10.5px] text-warning">Unassigned</Text>
               </View>
             )}
-            {transaction.category && (
+            {transaction.categoryName && (
               <Text className="font-sans text-[11px] text-ink-muted">
-                {transaction.category}
+                {transaction.categoryName}
               </Text>
             )}
           </View>
@@ -102,11 +102,12 @@ export function SwipeableTransactionRow({
 
         <View className="items-end pb-2.5 border-b border-border" style={{ marginLeft: 8 }}>
           <Amount value={transaction.amount} size="row" />
-          {transaction.time ? (
-            <Text className="font-sans text-[10px] text-ink-faint mt-0.5">
-              {transaction.time}
-            </Text>
-          ) : null}
+          <Text className="font-sans text-[10px] text-ink-faint mt-0.5">
+            {new Date(transaction.date + "T00:00:00").toLocaleDateString("en-IE", {
+              month: "short",
+              day: "numeric",
+            })}
+          </Text>
         </View>
       </Pressable>
     </Swipeable>

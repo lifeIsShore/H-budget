@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   KeyboardAvoidingView,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -13,51 +14,42 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
 import { DatePickerField } from "@/components/ui/DatePickerField";
-import { sampleTransactions } from "@/data/sampleData";
+import { usePurposes } from "@/hooks/usePurposes";
+import { useCategories } from "@/hooks/useCategories";
+import { useVendorSuggestions } from "@/hooks/useVendorSuggestions";
+import { useTransactions } from "@/hooks/useTransactions";
 
 /**
- * UI-only — form state is local; wire onSave to the SQLite insert once the
- * data layer exists. Matches the field set in 03_Features.md section 2 and
- * the component spec in 05_UI_UX_Specification.md Screen 2. Vendor
- * autocomplete suggests from distinct vendor names already in
- * data/sampleData.ts — swap for a real prefix query once SQLite exists
- * (see Data Layer checklist item "Vendor autocomplete query").
+ * Quick-Add sheet — fully wired to SQLite.
+ * - Purposes and categories loaded from the real DB.
+ * - Vendor autocomplete queries real transaction history (debounced).
+ * - onSave inserts a real transaction row via useTransactions().add().
  */
-
-const purposes = ["University", "High School", "General"];
-const categories = ["Travel", "Food", "Equipment", "Software", "Other"];
-
-const knownVendors = Array.from(
-  new Set(sampleTransactions.map((t) => t.vendor).filter((v): v is string => !!v)),
-);
 
 export default function QuickAddSheet() {
   const { mode: initialMode } = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<"expense" | "income">(
-    initialMode === "income" ? "income" : "expense",
+    initialMode === "income" ? "income" : "expense"
   );
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [vendor, setVendor] = useState("");
   const [vendorFocused, setVendorFocused] = useState(false);
-  const [purpose, setPurpose] = useState<string | null>(null);
-  const [category, setCategory] = useState<string | null>(null);
+  const [purposeId, setPurposeId] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const { purposes } = usePurposes();
+  const { categories } = useCategories();
+  const vendorSuggestions = useVendorSuggestions(vendor);
+  const { add } = useTransactions();
 
   const isExpense = mode === "expense";
   const numericAmount = parseFloat(amount);
   const canSave = !Number.isNaN(numericAmount) && numericAmount > 0;
-
   const amountColor = useMemo(() => (isExpense ? "#B5473A" : "#3F7A5C"), [isExpense]);
 
-  const vendorSuggestions = useMemo(() => {
-    const q = vendor.trim().toLowerCase();
-    if (!q) return [];
-    return knownVendors.filter(
-      (v) => v.toLowerCase().includes(q) && v.toLowerCase() !== q,
-    );
-  }, [vendor]);
   const showSuggestions = vendorFocused && vendorSuggestions.length > 0;
 
   function close() {
@@ -67,10 +59,26 @@ export default function QuickAddSheet() {
   async function handleSave() {
     if (!canSave) return;
     setSaving(true);
-    // TODO: insert into SQLite `transactions` table (see 04_Data_Model.md).
-    await new Promise((r) => setTimeout(r, 400));
-    setSaving(false);
-    close();
+    try {
+      const amountCents = Math.round(numericAmount * 100);
+      const isoDate = date.toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+      await add({
+        type: isExpense ? "expense" : "income",
+        amountCents,
+        date: isoDate,
+        vendor: vendor.trim() || null,
+        purposeId: purposeId,
+        categoryId: categoryId,
+        note: note.trim() || null,
+      });
+
+      close();
+    } catch (e) {
+      console.error("Failed to save transaction:", e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -90,16 +98,35 @@ export default function QuickAddSheet() {
           {/* Header */}
           <View className="flex-row items-center justify-between px-4 pt-3 pb-1">
             <Text className="font-sans-semibold text-[15px] text-ink">New Transaction</Text>
-            <Pressable onPress={close} hitSlop={12} style={{ width: 48, height: 48 }} className="items-end justify-center">
+            <Pressable
+              onPress={close}
+              hitSlop={12}
+              style={{ width: 48, height: 48 }}
+              className="items-end justify-center"
+            >
               <MaterialIcons name="close" size={22} color="#6B6659" />
             </Pressable>
           </View>
 
-          <View className="px-4 pb-2">
+          <ScrollView
+            className="px-4 pb-2"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {/* Type toggle */}
             <View className="flex-row bg-surface-alt rounded-full p-1 mt-1">
-              <ModeSegment label="Expense" active={isExpense} tone="negative" onPress={() => setMode("expense")} />
-              <ModeSegment label="Income" active={!isExpense} tone="positive" onPress={() => setMode("income")} />
+              <ModeSegment
+                label="Expense"
+                active={isExpense}
+                tone="negative"
+                onPress={() => setMode("expense")}
+              />
+              <ModeSegment
+                label="Income"
+                active={!isExpense}
+                tone="positive"
+                onPress={() => setMode("income")}
+              />
             </View>
 
             {/* Amount */}
@@ -163,14 +190,19 @@ export default function QuickAddSheet() {
             <Field label="Purpose">
               <View className="flex-row flex-wrap gap-2">
                 {purposes.map((p) => (
-                  <Chip key={p} label={p} selected={purpose === p} onPress={() => setPurpose(p)} />
+                  <Chip
+                    key={p.id}
+                    label={p.name}
+                    selected={purposeId === p.id}
+                    onPress={() => setPurposeId(p.id)}
+                  />
                 ))}
                 <Chip
                   label="Unassigned"
                   dashed
                   tone="warning"
-                  selected={purpose === null && purpose !== undefined}
-                  onPress={() => setPurpose(null)}
+                  selected={purposeId === null}
+                  onPress={() => setPurposeId(null)}
                 />
               </View>
             </Field>
@@ -179,7 +211,12 @@ export default function QuickAddSheet() {
             <Field label="Category">
               <View className="flex-row flex-wrap gap-2">
                 {categories.map((c) => (
-                  <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(c)} />
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    selected={categoryId === c.id}
+                    onPress={() => setCategoryId(c.id)}
+                  />
                 ))}
               </View>
             </Field>
@@ -205,7 +242,7 @@ export default function QuickAddSheet() {
                 onPress={handleSave}
               />
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
     </View>

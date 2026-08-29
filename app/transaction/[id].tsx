@@ -7,6 +7,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   Modal,
+  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -16,21 +18,17 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ToastProvider";
-import { sampleTransactions } from "@/data/sampleData";
+import { useTransaction } from "@/hooks/useTransactions";
+import { usePurposes } from "@/hooks/usePurposes";
+import { useCategories } from "@/hooks/useCategories";
+import type { TransactionUI } from "@/db/repositories/transactionRepo";
 
 /**
- * UI-only — View Mode, Edit Mode, and Delete Confirmation per
- * 05_UI_UX_Specification.md Screen 4. Save/Delete are not wired to SQLite
- * yet (Phase 7); this screen mutates nothing, it only demonstrates the
- * full interaction, including the Undo toast on delete (Phase 8's global
- * Toast, wired here — tapping Undo currently just dismisses the toast,
- * since there's no real delete underneath it to reverse yet). Open
- * directly into Edit Mode via ?edit=1, or straight to the delete dialog
- * via ?confirmDelete=1 (both set by Ledger's swipe actions).
+ * Transaction Detail / Edit / Delete — fully wired to SQLite.
+ * - View Mode: shows all fields from real data.
+ * - Edit Mode: saves via updateTransaction; disabled until something changes.
+ * - Delete: calls deleteTransaction, shows Undo toast that actually re-inserts the row.
  */
-
-const purposes = ["University", "High School", "General"];
-const categories = ["Travel", "Food", "Equipment", "Software", "Other"];
 
 export default function TransactionDetail() {
   const toast = useToast();
@@ -40,24 +38,110 @@ export default function TransactionDetail() {
     confirmDelete?: string;
   }>();
 
-  const original = useMemo(() => sampleTransactions.find((t) => t.id === id), [id]);
+  const { transaction: original, loading, edit: saveEdit, remove } = useTransaction(id);
+  const { purposes } = usePurposes();
+  const { categories } = useCategories();
 
   const [mode, setMode] = useState<"view" | "edit">(edit === "1" ? "edit" : "view");
   const [showDeleteDialog, setShowDeleteDialog] = useState(confirmDelete === "1");
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [amountText, setAmountText] = useState(
-    original ? Math.abs(original.amount).toFixed(2) : "",
-  );
-  const [vendor, setVendor] = useState(original?.vendor ?? "");
-  const [purpose, setPurpose] = useState<string | null>(original?.purpose ?? null);
-  const [category, setCategory] = useState<string | null>(original?.category ?? null);
-  const [note, setNote] = useState(original?.note ?? "");
+  const [amountText, setAmountText] = useState<string | null>(null);
+  const [vendor, setVendor] = useState<string | null>(null);
+  const [purposeId, setPurposeId] = useState<string | null | undefined>(undefined);
+  const [categoryId, setCategoryId] = useState<string | null | undefined>(undefined);
+  const [note, setNote] = useState<string | null>(null);
+
+  // Use original values as defaults; local state is only set when user edits
+  const effectiveAmount = amountText ?? (original ? String(original.amountCents / 100) : "0");
+  const effectiveVendor = vendor ?? (original?.vendor ?? "");
+  const effectivePurposeId = purposeId === undefined ? original?.purposeId : purposeId;
+  const effectiveCategoryId = categoryId === undefined ? original?.categoryId : categoryId;
+  const effectiveNote = note ?? (original?.note ?? "");
+
+  const isExpense = original?.type === "expense";
+  const numericAmount = parseFloat(effectiveAmount) || 0;
+  const amountCentsNew = Math.round(numericAmount * 100);
+
+  const hasChanges = useMemo(() => {
+    if (!original) return false;
+    return (
+      amountCentsNew !== original.amountCents ||
+      effectiveVendor !== (original.vendor ?? "") ||
+      effectivePurposeId !== original.purposeId ||
+      effectiveCategoryId !== original.categoryId ||
+      effectiveNote !== (original.note ?? "")
+    );
+  }, [original, amountCentsNew, effectiveVendor, effectivePurposeId, effectiveCategoryId, effectiveNote]);
+
+  function close() {
+    router.back();
+  }
+
+  async function handleSave() {
+    if (!original || !hasChanges) return;
+    setSaving(true);
+    try {
+      await saveEdit({
+        amountCents: amountCentsNew,
+        vendor: effectiveVendor || null,
+        purposeId: effectivePurposeId ?? null,
+        categoryId: effectiveCategoryId ?? null,
+        note: effectiveNote || null,
+      });
+      toast.show("Changes saved");
+      close();
+    } catch (e) {
+      toast.show("Save failed — " + (e instanceof Error ? e.message : "unknown"), {
+        tone: "negative",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!original) return;
+    setDeleting(true);
+    try {
+      const { snapshot, undo } = await remove();
+      close();
+      toast.show(
+        `Deleted ${snapshot.vendor ?? "transaction"} — EUR ${(snapshot.amountCents / 100).toFixed(2)}`,
+        {
+          actionLabel: "Undo",
+          tone: "negative",
+          onAction: async () => {
+            await undo();
+          },
+        }
+      );
+    } catch (e) {
+      setDeleting(false);
+      toast.show("Delete failed — " + (e instanceof Error ? e.message : "unknown"), {
+        tone: "negative",
+      });
+    }
+  }
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[#1C1B1966]" onPress={close} />
+        <SafeAreaView edges={["bottom"]} className="bg-surface rounded-t-sheet" style={{ minHeight: 120 }}>
+          <View className="flex-1 items-center justify-center py-8">
+            <ActivityIndicator color="#22211F" />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   if (!original) {
     return (
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[#1C1B1966]" onPress={() => router.back()} />
+        <Pressable className="absolute inset-0 bg-[#1C1B1966]" onPress={close} />
         <SafeAreaView edges={["bottom"]} className="bg-surface rounded-t-sheet">
           <EmptyState icon="receipt-long" title="Transaction not found" />
         </SafeAreaView>
@@ -65,34 +149,8 @@ export default function TransactionDetail() {
     );
   }
 
-  const isExpense = original.amount < 0;
-  const numericAmount = parseFloat(amountText) || 0;
-  const signedNewAmount = isExpense ? -numericAmount : numericAmount;
-  const amountChanged = signedNewAmount !== original.amount;
-  const hasChanges =
-    amountChanged ||
-    vendor !== (original.vendor ?? "") ||
-    purpose !== original.purpose ||
-    category !== original.category ||
-    note !== (original.note ?? "");
-
-  function close() {
-    router.back();
-  }
-
-  function handleDelete() {
-    setDeleting(true);
-    // TODO: DELETE from SQLite (Phase 7). Undo currently has nothing to
-    // reverse — once real deletes exist, Undo should re-insert the row.
-    setTimeout(() => {
-      setDeleting(false);
-      close();
-      toast.show(
-        `Deleted ${original.vendor ?? "transaction"} — EUR ${Math.abs(original.amount).toFixed(2)}`,
-        { actionLabel: "Undo", tone: "negative", onAction: () => {} },
-      );
-    }, 400);
-  }
+  const amountChanged = amountCentsNew !== original.amountCents;
+  const delta = Math.abs(amountCentsNew / 100 - original.amountCents / 100);
 
   return (
     <View className="flex-1 justify-end">
@@ -100,7 +158,7 @@ export default function TransactionDetail() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ maxHeight: "75%" }}
+        style={{ maxHeight: "80%" }}
       >
         <SafeAreaView edges={["bottom"]} className="bg-surface rounded-t-sheet">
           <View className="items-center pt-2.5">
@@ -121,7 +179,7 @@ export default function TransactionDetail() {
             </Pressable>
           </View>
 
-          <View className="px-4 pb-4">
+          <ScrollView className="px-4 pb-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {mode === "view" ? (
               <ViewMode
                 transaction={original}
@@ -131,25 +189,29 @@ export default function TransactionDetail() {
             ) : (
               <EditMode
                 isExpense={isExpense}
-                amountText={amountText}
+                amountText={effectiveAmount}
                 setAmountText={setAmountText}
-                vendor={vendor}
+                vendor={effectiveVendor}
                 setVendor={setVendor}
-                purpose={purpose}
-                setPurpose={setPurpose}
-                category={category}
-                setCategory={setCategory}
-                note={note}
+                purposeId={effectivePurposeId ?? null}
+                setPurposeId={setPurposeId}
+                categoryId={effectiveCategoryId ?? null}
+                setCategoryId={setCategoryId}
+                note={effectiveNote}
                 setNote={setNote}
                 amountChanged={amountChanged}
-                originalAmount={original.amount}
-                newAmount={signedNewAmount}
+                originalAmountCents={original.amountCents}
+                newAmountCents={amountCentsNew}
+                delta={delta}
                 hasChanges={hasChanges}
+                saving={saving}
+                purposes={purposes}
+                categories={categories}
                 onCancel={() => setMode("view")}
-                onSave={close}
+                onSave={handleSave}
               />
             )}
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
 
@@ -162,10 +224,10 @@ export default function TransactionDetail() {
             <Text className="font-sans text-[13.5px] text-ink-muted mt-2 leading-5">
               This will remove{" "}
               <Text className="font-sans-medium text-ink">
-                EUR {Math.abs(original.amount).toFixed(2)}
+                EUR {(original.amountCents / 100).toFixed(2)}
               </Text>{" "}
               and restore it to your Total Balance
-              {original.purpose ? ` and ${original.purpose} pool` : ""}.
+              {original.purposeName ? ` and ${original.purposeName} pool` : ""}.
             </Text>
             <View className="flex-row justify-end gap-5 mt-5">
               <Pressable
@@ -181,13 +243,11 @@ export default function TransactionDetail() {
                     deleting ? "bg-surface-alt border border-border" : "bg-negative"
                   }`}
                 >
-                  <Text
-                    className={`font-sans-medium text-[14px] ${
-                      deleting ? "text-ink-faint" : "text-surface"
-                    }`}
-                  >
-                    {deleting ? "Deleting…" : "Delete"}
-                  </Text>
+                  {deleting ? (
+                    <ActivityIndicator color="#B5473A" size="small" />
+                  ) : (
+                    <Text className="font-sans-medium text-[14px] text-surface">Delete</Text>
+                  )}
                 </View>
               </Pressable>
             </View>
@@ -198,23 +258,35 @@ export default function TransactionDetail() {
   );
 }
 
+// ─── View Mode ────────────────────────────────────────────────────────────────
+
 function ViewMode({
   transaction,
   onEdit,
   onDelete,
 }: {
-  transaction: (typeof sampleTransactions)[number];
+  transaction: TransactionUI;
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const isExpense = transaction.amount < 0;
+  const isExpense = transaction.type === "expense";
+  const createdDate = new Date(transaction.createdAt).toLocaleDateString("en-IE", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const createdTime = new Date(transaction.createdAt).toLocaleTimeString("en-IE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <View>
       <View className="items-center mt-1 mb-2">
         <Amount value={transaction.amount} size="hero" />
         <Text className="font-sans text-[12.5px] text-ink-muted mt-1.5">
-          {transaction.date} at {transaction.time}
+          {createdDate} at {createdTime}
         </Text>
       </View>
 
@@ -222,11 +294,9 @@ function ViewMode({
 
       <DetailRow label="Type">
         <View className="flex-row items-center gap-1.5">
-          <View
-            className={`w-2 h-2 rounded-full ${isExpense ? "bg-negative" : "bg-positive"}`}
-          />
+          <View className={`w-2 h-2 rounded-full ${isExpense ? "bg-negative" : "bg-positive"}`} />
           <Text className="font-sans-medium text-[13.5px] text-ink">
-            {isExpense ? "Expense" : "Income"}
+            {isExpense ? "Expense" : transaction.type === "income" ? "Income" : "Adjustment"}
           </Text>
         </View>
       </DetailRow>
@@ -242,9 +312,9 @@ function ViewMode({
       </DetailRow>
 
       <DetailRow label="Purpose">
-        {transaction.purpose ? (
+        {transaction.purposeName ? (
           <View className="bg-surface-alt px-2 py-1 rounded">
-            <Text className="font-sans text-[12px] text-ink-muted">{transaction.purpose}</Text>
+            <Text className="font-sans text-[12px] text-ink-muted">{transaction.purposeName}</Text>
           </View>
         ) : (
           <View className="bg-warning-subtle px-2 py-1 rounded">
@@ -254,9 +324,9 @@ function ViewMode({
       </DetailRow>
 
       <DetailRow label="Category">
-        {transaction.category ? (
+        {transaction.categoryName ? (
           <View className="bg-surface-alt px-2 py-1 rounded">
-            <Text className="font-sans text-[12px] text-ink-muted">{transaction.category}</Text>
+            <Text className="font-sans text-[12px] text-ink-muted">{transaction.categoryName}</Text>
           </View>
         ) : (
           <Text className="font-sans text-[13.5px] text-ink-faint">---</Text>
@@ -275,11 +345,11 @@ function ViewMode({
 
       <DetailRow label="Created">
         <Text className="font-sans text-[11.5px] text-ink-faint">
-          {transaction.date}, {transaction.time}
+          {createdDate}, {createdTime}
         </Text>
       </DetailRow>
 
-      <View className="gap-2.5 mt-5">
+      <View className="gap-2.5 mt-5 mb-2">
         <Button label="Edit Transaction" variant="outline" onPress={onEdit} />
         <Button label="Delete Transaction" variant="ghost" onPress={onDelete} />
       </View>
@@ -287,22 +357,28 @@ function ViewMode({
   );
 }
 
+// ─── Edit Mode ────────────────────────────────────────────────────────────────
+
 function EditMode({
   isExpense,
   amountText,
   setAmountText,
   vendor,
   setVendor,
-  purpose,
-  setPurpose,
-  category,
-  setCategory,
+  purposeId,
+  setPurposeId,
+  categoryId,
+  setCategoryId,
   note,
   setNote,
   amountChanged,
-  originalAmount,
-  newAmount,
+  originalAmountCents,
+  newAmountCents,
+  delta,
   hasChanges,
+  saving,
+  purposes,
+  categories,
   onCancel,
   onSave,
 }: {
@@ -311,21 +387,23 @@ function EditMode({
   setAmountText: (v: string) => void;
   vendor: string;
   setVendor: (v: string) => void;
-  purpose: string | null;
-  setPurpose: (v: string | null) => void;
-  category: string | null;
-  setCategory: (v: string | null) => void;
+  purposeId: string | null;
+  setPurposeId: (v: string | null) => void;
+  categoryId: string | null;
+  setCategoryId: (v: string | null) => void;
   note: string;
   setNote: (v: string) => void;
   amountChanged: boolean;
-  originalAmount: number;
-  newAmount: number;
+  originalAmountCents: number;
+  newAmountCents: number;
+  delta: number;
   hasChanges: boolean;
+  saving: boolean;
+  purposes: { id: string; name: string }[];
+  categories: { id: string; name: string }[];
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const delta = Math.abs(Math.abs(newAmount) - Math.abs(originalAmount));
-
   return (
     <View>
       <View className="items-center mt-1">
@@ -344,9 +422,9 @@ function EditMode({
 
       {amountChanged && (
         <View className="bg-warning-subtle rounded-card px-3.5 py-3 mt-4">
-          <Text className="font-sans text-[12.5px] text-ink leading-4.5">
-            Changing from EUR {Math.abs(originalAmount).toFixed(2)} to EUR{" "}
-            {Math.abs(newAmount).toFixed(2)} will adjust your balance by EUR {delta.toFixed(2)}.
+          <Text className="font-sans text-[12.5px] text-ink leading-5">
+            Changing from EUR {(originalAmountCents / 100).toFixed(2)} to EUR{" "}
+            {(newAmountCents / 100).toFixed(2)} will adjust your balance by EUR {delta.toFixed(2)}.
           </Text>
         </View>
       )}
@@ -364,14 +442,19 @@ function EditMode({
       <Field label="Purpose">
         <View className="flex-row flex-wrap gap-2">
           {purposes.map((p) => (
-            <Chip key={p} label={p} selected={purpose === p} onPress={() => setPurpose(p)} />
+            <Chip
+              key={p.id}
+              label={p.name}
+              selected={purposeId === p.id}
+              onPress={() => setPurposeId(p.id)}
+            />
           ))}
           <Chip
             label="Unassigned"
             dashed
             tone="warning"
-            selected={purpose === null}
-            onPress={() => setPurpose(null)}
+            selected={purposeId === null}
+            onPress={() => setPurposeId(null)}
           />
         </View>
       </Field>
@@ -379,7 +462,12 @@ function EditMode({
       <Field label="Category">
         <View className="flex-row flex-wrap gap-2">
           {categories.map((c) => (
-            <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(c)} />
+            <Chip
+              key={c.id}
+              label={c.name}
+              selected={categoryId === c.id}
+              onPress={() => setCategoryId(c.id)}
+            />
           ))}
         </View>
       </Field>
@@ -394,13 +482,21 @@ function EditMode({
         />
       </Field>
 
-      <View className="gap-2.5 mt-5">
-        <Button label="Save Changes" variant="primary" disabled={!hasChanges} onPress={onSave} />
+      <View className="gap-2.5 mt-5 mb-2">
+        <Button
+          label="Save Changes"
+          variant="primary"
+          disabled={!hasChanges || saving}
+          loading={saving}
+          onPress={onSave}
+        />
         <Button label="Cancel" variant="muted" onPress={onCancel} />
       </View>
     </View>
   );
 }
+
+// ─── Shared sub-components ────────────────────────────────────────────────────
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

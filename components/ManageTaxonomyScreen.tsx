@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -7,24 +7,34 @@ import { router } from "expo-router";
 type Item = { id: string; name: string; usageCount: number };
 
 /**
- * Shared by Manage Purposes and Manage Categories — spec calls them out as
- * "identical layout and behavior." Local state only; edits/adds/deletes
- * don't persist (Phase 7). usageCount comes from data/sampleData.ts so the
- * "can't delete — in use" rule is demonstrable now.
+ * Shared by Manage Purposes and Manage Categories.
+ * Now accepts async onAdd/onEdit/onDelete handlers that persist to SQLite —
+ * the parent (purposes.tsx / categories.tsx) passes in the real hook mutations.
+ * Local state is kept for optimistic UI; the parent's data reload (via hooks)
+ * is what makes the list durable.
  */
 export function ManageTaxonomyScreen({
   title,
-  initialItems,
+  items,
   singularLabel,
+  loading,
+  onAdd,
+  onEdit,
+  onDelete,
 }: {
   title: string;
-  initialItems: Item[];
+  items: Item[];
   singularLabel: string;
+  loading?: boolean;
+  onAdd: (name: string) => Promise<void>;
+  onEdit: (id: string, name: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
-  const [items, setItems] = useState(initialItems);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [newName, setNewName] = useState("");
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [addPending, setAddPending] = useState(false);
 
   function isDuplicate(name: string, excludeId?: string) {
     const t = name.trim().toLowerCase();
@@ -36,29 +46,44 @@ export function ManageTaxonomyScreen({
     setEditValue(item.name);
   }
 
-  function commitEdit() {
+  async function commitEdit() {
     if (!editingId) return;
     const trimmed = editValue.trim();
     if (trimmed && !isDuplicate(trimmed, editingId)) {
-      setItems((prev) => prev.map((i) => (i.id === editingId ? { ...i, name: trimmed } : i)));
+      setPendingId(editingId);
+      try {
+        await onEdit(editingId, trimmed);
+      } finally {
+        setPendingId(null);
+      }
     }
     setEditingId(null);
   }
 
-  function handleDelete(item: Item) {
+  async function handleDelete(item: Item) {
     if (items.length <= 1 || item.usageCount > 0) return;
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    setPendingId(item.id);
+    try {
+      await onDelete(item.id);
+    } finally {
+      setPendingId(null);
+    }
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     const trimmed = newName.trim();
     if (!trimmed || isDuplicate(trimmed)) return;
-    setItems((prev) => [...prev, { id: `new-${Date.now()}`, name: trimmed, usageCount: 0 }]);
-    setNewName("");
+    setAddPending(true);
+    try {
+      await onAdd(trimmed);
+      setNewName("");
+    } finally {
+      setAddPending(false);
+    }
   }
 
   const addDuplicate = newName.trim().length > 0 && isDuplicate(newName);
-  const addDisabled = !newName.trim() || addDuplicate;
+  const addDisabled = !newName.trim() || addDuplicate || addPending;
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
@@ -72,16 +97,18 @@ export function ManageTaxonomyScreen({
           <MaterialIcons name="arrow-back" size={22} color="#22211F" />
         </Pressable>
         <Text className="font-sans-semibold text-[17px] text-ink ml-1">{title}</Text>
+        {loading && <ActivityIndicator color="#22211F" style={{ marginLeft: "auto", marginRight: 16 }} size="small" />}
       </View>
 
       <View className="px-4 pt-1">
         {items.map((item) => {
           const disabledDelete = items.length <= 1 || item.usageCount > 0;
+          const isPending = pendingId === item.id;
           return (
             <View
               key={item.id}
               className="flex-row items-center border-b border-border"
-              style={{ minHeight: 56 }}
+              style={{ minHeight: 56, opacity: isPending ? 0.5 : 1 }}
             >
               {editingId === item.id ? (
                 <TextInput
@@ -98,6 +125,7 @@ export function ManageTaxonomyScreen({
               <Pressable
                 onPress={() => startEdit(item)}
                 hitSlop={8}
+                disabled={isPending}
                 style={{ width: 48, height: 48 }}
                 className="items-center justify-center"
               >
@@ -105,7 +133,7 @@ export function ManageTaxonomyScreen({
               </Pressable>
               <Pressable
                 onPress={() => handleDelete(item)}
-                disabled={disabledDelete}
+                disabled={disabledDelete || isPending}
                 hitSlop={8}
                 style={{ width: 48, height: 48 }}
                 className="items-center justify-center"
@@ -138,9 +166,13 @@ export function ManageTaxonomyScreen({
             addDisabled ? "border-border" : "border-brand"
           }`}
         >
-          <Text className={`font-sans-medium text-[13px] ${addDisabled ? "text-ink-faint" : "text-brand"}`}>
-            Add
-          </Text>
+          {addPending ? (
+            <ActivityIndicator size="small" color="#9C7A3C" />
+          ) : (
+            <Text className={`font-sans-medium text-[13px] ${addDisabled ? "text-ink-faint" : "text-brand"}`}>
+              Add
+            </Text>
+          )}
         </Pressable>
       </View>
       {addDuplicate && (
