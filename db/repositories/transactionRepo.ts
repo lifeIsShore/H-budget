@@ -167,30 +167,36 @@ export async function insertTransaction(
 ): Promise<TransactionUI> {
   const id = Crypto.randomUUID();
   const now = new Date().toISOString();
+  const db = getDb();
 
-  await getDb().runAsync(
-    `INSERT INTO transactions
-       (id, type, amount, date, vendor, purpose_id, category_id, note, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      data.type,
-      data.amountCents,
-      data.date,
-      data.vendor ?? null,
-      data.purposeId ?? null,
-      data.categoryId ?? null,
-      data.note ?? null,
-      now,
-      now,
-    ]
-  );
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      `INSERT INTO transactions
+         (id, type, amount, date, vendor, purpose_id, category_id, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.type,
+        data.amountCents,
+        data.date,
+        data.vendor ?? null,
+        data.purposeId ?? null,
+        data.categoryId ?? null,
+        data.note ?? null,
+        now,
+        now,
+      ]
+    );
 
-  await writeAuditLog({
-    transactionId: id,
-    action: "create",
-    previousState: null,
-    newState: { id, ...data, created_at: now, updated_at: now },
+    await writeAuditLog(
+      {
+        transactionId: id,
+        action: "create",
+        previousState: null,
+        newState: { id, ...data, created_at: now, updated_at: now },
+      },
+      tx
+    );
   });
 
   return (await getTransactionById(id))!;
@@ -219,16 +225,22 @@ export async function updateTransaction(
   params.push(now);
   params.push(id);
 
-  await getDb().runAsync(
-    `UPDATE transactions SET ${fields.join(", ")} WHERE id = ?`,
-    params
-  );
+  const db = getDb();
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      `UPDATE transactions SET ${fields.join(", ")} WHERE id = ?`,
+      params
+    );
 
-  await writeAuditLog({
-    transactionId: id,
-    action: "update",
-    previousState: existing,
-    newState: { ...existing, ...data, updatedAt: now },
+    await writeAuditLog(
+      {
+        transactionId: id,
+        action: "update",
+        previousState: existing,
+        newState: { ...existing, ...data, updatedAt: now },
+      },
+      tx
+    );
   });
 
   return (await getTransactionById(id))!;
@@ -238,14 +250,19 @@ export async function deleteTransaction(id: string): Promise<TransactionUI> {
   const existing = await getTransactionById(id);
   if (!existing) throw new Error(`Transaction ${id} not found.`);
 
-  await writeAuditLog({
-    transactionId: id,
-    action: "delete",
-    previousState: existing,
-    newState: null,
+  const db = getDb();
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await writeAuditLog(
+      {
+        transactionId: id,
+        action: "delete",
+        previousState: existing,
+        newState: null,
+      },
+      tx
+    );
+    await tx.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
   });
-
-  await getDb().runAsync("DELETE FROM transactions WHERE id = ?", [id]);
   return existing; // returned so callers can Undo (re-insert)
 }
 
@@ -272,13 +289,17 @@ export async function restoreTransaction(t: TransactionUI): Promise<void> {
 
 // ─── audit log ────────────────────────────────────────────────────────────────
 
-async function writeAuditLog(entry: {
-  transactionId: string;
-  action: "create" | "update" | "delete";
-  previousState: object | null;
-  newState: object | null;
-}): Promise<void> {
-  await getDb().runAsync(
+async function writeAuditLog(
+  entry: {
+    transactionId: string;
+    action: "create" | "update" | "delete";
+    previousState: object | null;
+    newState: object | null;
+  },
+  tx?: any
+): Promise<void> {
+  const db = tx ?? getDb();
+  await db.runAsync(
     `INSERT INTO audit_log (id, transaction_id, action, previous_state, new_state, changed_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [

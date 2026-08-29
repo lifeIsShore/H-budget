@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, TextInput, Pressable, SectionList } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -89,6 +90,26 @@ export default function Ledger() {
     return labels;
   }, [filters]);
 
+  // Flatten for FlashList
+  const flattenedData = useMemo(() => {
+    const arr: any[] = [];
+    sections.forEach((sec) => {
+      arr.push({ type: "header", title: sec.title, total: sec.total });
+      sec.data.forEach((item) => {
+        arr.push({ type: "item", transaction: item });
+      });
+    });
+    return arr;
+  }, [sections]);
+
+  const stickyHeaderIndices = useMemo(() => {
+    const indices: number[] = [];
+    flattenedData.forEach((item, index) => {
+      if (item.type === "header") indices.push(index);
+    });
+    return indices;
+  }, [flattenedData]);
+
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
       {/* Search + filter row */}
@@ -143,50 +164,63 @@ export default function Ledger() {
           }
         />
       ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          stickySectionHeadersEnabled
+        <FlashList
+          data={flattenedData}
+          keyExtractor={(item, idx) =>
+            item.type === "header" ? item.title : item.transaction.id
+          }
+          stickyHeaderIndices={stickyHeaderIndices}
+          estimatedItemSize={72}
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
-          renderSectionHeader={({ section }) => (
-            <View
-              className="flex-row items-center justify-between bg-surface-alt px-4"
-              style={{ height: 32 }}
-            >
-              <Text className="font-sans-medium text-[11.5px] text-ink-muted">
-                {section.title}
-              </Text>
-              <Text
-                className={`font-mono text-[11.5px] ${
-                  section.total >= 0 ? "text-positive" : "text-negative"
-                }`}
-              >
-                {section.total >= 0 ? "+" : "-"}EUR{" "}
-                {Math.abs(section.total).toLocaleString("en-IE", { minimumFractionDigits: 2 })}
-              </Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <SwipeableTransactionRow
-              transaction={item}
-              onPress={() =>
-                router.push({ pathname: "/transaction/[id]", params: { id: item.id } })
-              }
-              onEdit={() =>
-                router.push({
-                  pathname: "/transaction/[id]",
-                  params: { id: item.id, edit: "1" },
-                })
-              }
-              onDelete={() =>
-                router.push({
-                  pathname: "/transaction/[id]",
-                  params: { id: item.id, confirmDelete: "1" },
-                })
-              }
-            />
-          )}
+          getItemType={(item) => item.type}
+          renderItem={({ item }) => {
+            if (item.type === "header") {
+              return (
+                <View
+                  className="flex-row items-center justify-between bg-surface-alt px-4"
+                  style={{ height: 32 }}
+                >
+                  <Text className="font-sans-medium text-[11.5px] text-ink-muted">
+                    {item.title}
+                  </Text>
+                  <Text
+                    className={`font-mono text-[11.5px] ${
+                      item.total >= 0 ? "text-positive" : "text-negative"
+                    }`}
+                  >
+                    {item.total >= 0 ? "+" : "-"}EUR{" "}
+                    {Math.abs(item.total).toLocaleString("en-IE", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </Text>
+                </View>
+              );
+            }
+            return (
+              <SwipeableTransactionRow
+                transaction={item.transaction}
+                onPress={() =>
+                  router.push({
+                    pathname: "/transaction/[id]",
+                    params: { id: item.transaction.id },
+                  })
+                }
+                onEdit={() =>
+                  router.push({
+                    pathname: "/transaction/[id]",
+                    params: { id: item.transaction.id, edit: "1" },
+                  })
+                }
+                onDelete={() =>
+                  router.push({
+                    pathname: "/transaction/[id]",
+                    params: { id: item.transaction.id, confirmDelete: "1" },
+                  })
+                }
+              />
+            );
+          }}
         />
       )}
     </SafeAreaView>

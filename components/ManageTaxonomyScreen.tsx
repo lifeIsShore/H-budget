@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { FlashList } from "@shopify/flash-list";
 
 type Item = { id: string; name: string; usageCount: number };
 
@@ -100,86 +101,93 @@ export function ManageTaxonomyScreen({
         {loading && <ActivityIndicator color="#22211F" style={{ marginLeft: "auto", marginRight: 16 }} size="small" />}
       </View>
 
-      <View className="px-4 pt-1">
-        {items.map((item) => {
-          const disabledDelete = items.length <= 1 || item.usageCount > 0;
-          const isPending = pendingId === item.id;
-          return (
-            <View
-              key={item.id}
-              className="flex-row items-center border-b border-border"
-              style={{ minHeight: 56, opacity: isPending ? 0.5 : 1 }}
-            >
-              {editingId === item.id ? (
+      <View className="flex-1 px-4 pt-1">
+        <FlashList
+          data={items}
+          estimatedItemSize={56}
+          keyExtractor={(item) => item.id}
+          ListFooterComponent={
+            <View>
+              <View className="pt-4 flex-row items-center gap-2">
                 <TextInput
-                  value={editValue}
-                  onChangeText={setEditValue}
-                  onSubmitEditing={commitEdit}
-                  onBlur={commitEdit}
-                  autoFocus
-                  className="flex-1 font-sans text-[14px] text-ink py-2"
+                  value={newName}
+                  onChangeText={setNewName}
+                  placeholder={`New ${singularLabel} name...`}
+                  placeholderTextColor="#A39D8E"
+                  className="flex-1 font-sans text-[14px] text-ink bg-surface-alt border border-border rounded-input px-3"
+                  style={{ height: 48 }}
                 />
-              ) : (
-                <Text className="flex-1 font-sans text-[14px] text-ink">{item.name}</Text>
+                <Pressable
+                  onPress={handleAdd}
+                  disabled={addDisabled}
+                  style={{ height: 48 }}
+                  className={`px-4 rounded-button items-center justify-center border ${
+                    addDisabled ? "border-border" : "border-brand"
+                  }`}
+                >
+                  {addPending ? (
+                    <ActivityIndicator size="small" color="#9C7A3C" />
+                  ) : (
+                    <Text className={`font-sans-medium text-[13px] ${addDisabled ? "text-ink-faint" : "text-brand"}`}>
+                      Add
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+              {addDuplicate && (
+                <Text className="pt-1.5 font-sans text-[11.5px] text-negative">
+                  This name already exists.
+                </Text>
               )}
-              <Pressable
-                onPress={() => startEdit(item)}
-                hitSlop={8}
-                disabled={isPending}
-                style={{ width: 48, height: 48 }}
-                className="items-center justify-center"
-              >
-                <MaterialIcons name="edit" size={18} color="#6B6659" />
-              </Pressable>
-              <Pressable
-                onPress={() => handleDelete(item)}
-                disabled={disabledDelete || isPending}
-                hitSlop={8}
-                style={{ width: 48, height: 48 }}
-                className="items-center justify-center"
-              >
-                <MaterialIcons
-                  name="delete-outline"
-                  size={18}
-                  color={disabledDelete ? "#D8D5CB" : "#B5473A"}
-                />
-              </Pressable>
             </View>
-          );
-        })}
-      </View>
-
-      <View className="px-4 pt-4 flex-row items-center gap-2">
-        <TextInput
-          value={newName}
-          onChangeText={setNewName}
-          placeholder={`New ${singularLabel} name...`}
-          placeholderTextColor="#A39D8E"
-          className="flex-1 font-sans text-[14px] text-ink bg-surface-alt border border-border rounded-input px-3"
-          style={{ height: 48 }}
+          }
+          renderItem={({ item }) => {
+            const disabledDelete = items.length <= 1 || item.usageCount > 0;
+            const isPending = pendingId === item.id;
+            return (
+              <View
+                className="flex-row items-center border-b border-border"
+                style={{ minHeight: 56, opacity: isPending ? 0.5 : 1 }}
+              >
+                {editingId === item.id ? (
+                  <TextInput
+                    value={editValue}
+                    onChangeText={setEditValue}
+                    onSubmitEditing={commitEdit}
+                    onBlur={commitEdit}
+                    autoFocus
+                    className="flex-1 font-sans text-[14px] text-ink py-2"
+                  />
+                ) : (
+                  <Text className="flex-1 font-sans text-[14px] text-ink">{item.name}</Text>
+                )}
+                <Pressable
+                  onPress={() => startEdit(item)}
+                  hitSlop={8}
+                  disabled={isPending}
+                  style={{ width: 48, height: 48 }}
+                  className="items-center justify-center"
+                >
+                  <MaterialIcons name="edit" size={18} color="#6B6659" />
+                </Pressable>
+                <Pressable
+                  onPress={() => handleDelete(item)}
+                  disabled={disabledDelete || isPending}
+                  hitSlop={8}
+                  style={{ width: 48, height: 48 }}
+                  className="items-center justify-center"
+                >
+                  <MaterialIcons
+                    name="delete-outline"
+                    size={18}
+                    color={disabledDelete ? "#D8D5CB" : "#B5473A"}
+                  />
+                </Pressable>
+              </View>
+            );
+          }}
         />
-        <Pressable
-          onPress={handleAdd}
-          disabled={addDisabled}
-          style={{ height: 48 }}
-          className={`px-4 rounded-button items-center justify-center border ${
-            addDisabled ? "border-border" : "border-brand"
-          }`}
-        >
-          {addPending ? (
-            <ActivityIndicator size="small" color="#9C7A3C" />
-          ) : (
-            <Text className={`font-sans-medium text-[13px] ${addDisabled ? "text-ink-faint" : "text-brand"}`}>
-              Add
-            </Text>
-          )}
-        </Pressable>
       </View>
-      {addDuplicate && (
-        <Text className="px-4 pt-1.5 font-sans text-[11.5px] text-negative">
-          This name already exists.
-        </Text>
-      )}
     </SafeAreaView>
   );
 }

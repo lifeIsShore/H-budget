@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import React, { useRef } from "react";
 import { View, Text, Pressable, Animated } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -10,7 +10,7 @@ import type { TransactionUI } from "@/db/repositories/transactionRepo";
  * standing in for the spec's "blue" panel — the app has no blue in its
  * palette, brand/ink is the equivalent primary-action color here).
  */
-export function SwipeableTransactionRow({
+export const SwipeableTransactionRow = React.memo(function SwipeableTransactionRow({
   transaction,
   onPress,
   onEdit,
@@ -112,7 +112,7 @@ export function SwipeableTransactionRow({
       </Pressable>
     </Swipeable>
   );
-}
+});
 
 function RevealAction({
   dragX,

@@ -125,52 +125,58 @@ export async function importJson(jsonString: string): Promise<void> {
 
   const db = getDb();
 
-  // Clear all tables (order matters — transactions reference purposes/categories)
-  await db.execAsync(`
-    DELETE FROM audit_log;
-    DELETE FROM transactions;
-    DELETE FROM categories;
-    DELETE FROM purposes;
-    DELETE FROM settings;
-  `);
+  // Wrap everything in an exclusive transaction
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    // Clear all tables (order matters — transactions reference purposes/categories)
+    await tx.execAsync(`
+      DELETE FROM audit_log;
+      DELETE FROM transactions;
+      DELETE FROM categories;
+      DELETE FROM purposes;
+      DELETE FROM settings;
+    `);
 
-  // Restore settings
-  for (const [key, value] of Object.entries(backup.data.settings ?? {})) {
-    await setSetting(key, String(value));
-  }
+    // Restore settings
+    for (const [key, value] of Object.entries(backup.data.settings ?? {})) {
+      await tx.runAsync(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        [key, String(value)]
+      );
+    }
 
-  // Restore purposes
-  for (const p of backup.data.purposes ?? []) {
-    const r = p as Record<string, unknown>;
-    await db.runAsync(
-      `INSERT OR IGNORE INTO purposes (id, name, color, sort_order, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [r.id, r.name, r.color ?? null, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
-    );
-  }
+    // Restore purposes
+    for (const p of backup.data.purposes ?? []) {
+      const r = p as Record<string, unknown>;
+      await tx.runAsync(
+        `INSERT OR IGNORE INTO purposes (id, name, color, sort_order, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [r.id, r.name, r.color ?? null, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
+      );
+    }
 
-  // Restore categories
-  for (const c of backup.data.categories ?? []) {
-    const r = c as Record<string, unknown>;
-    await db.runAsync(
-      `INSERT OR IGNORE INTO categories (id, name, sort_order, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [r.id, r.name, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
-    );
-  }
+    // Restore categories
+    for (const c of backup.data.categories ?? []) {
+      const r = c as Record<string, unknown>;
+      await tx.runAsync(
+        `INSERT OR IGNORE INTO categories (id, name, sort_order, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [r.id, r.name, r.sort_order ?? 0, r.is_active ?? 1, r.created_at] as any[]
+      );
+    }
 
-  // Restore transactions
-  for (const t of backup.data.transactions ?? []) {
-    const r = t as Record<string, unknown>;
-    await db.runAsync(
-      `INSERT OR IGNORE INTO transactions
-         (id, type, amount, date, vendor, purpose_id, category_id, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        r.id, r.type, r.amount, r.date,
-        r.vendor ?? null, r.purpose_id ?? null, r.category_id ?? null,
-        r.note ?? null, r.created_at, r.updated_at ?? r.created_at,
-      ] as any[]
-    );
-  }
+    // Restore transactions
+    for (const t of backup.data.transactions ?? []) {
+      const r = t as Record<string, unknown>;
+      await tx.runAsync(
+        `INSERT OR IGNORE INTO transactions
+           (id, type, amount, date, vendor, purpose_id, category_id, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          r.id, r.type, r.amount, r.date,
+          r.vendor ?? null, r.purpose_id ?? null, r.category_id ?? null,
+          r.note ?? null, r.created_at, r.updated_at ?? r.created_at,
+        ] as any[]
+      );
+    }
+  });
 }
