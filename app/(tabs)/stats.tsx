@@ -29,9 +29,14 @@ export default function Stats() {
   const [tab, setTab] = useState<SubTab>("purpose");
 
   const { stats, loading, reload } = useStats(year, month);
-  const { months: availableMonths } = useAvailableMonths();
+  const { months: availableMonths, reload: reloadMonths } = useAvailableMonths();
 
-  useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+      reloadMonths();
+    }, [reload, reloadMonths]),
+  );
 
   // Compute prev/next month and whether navigation is possible
   const { prevYM, nextYM } = useMemo(() => {

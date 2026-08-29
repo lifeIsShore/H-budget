@@ -24,15 +24,17 @@ export default function Dashboard() {
   const { transactions, loading: txLoading, reload: reloadTx } = useTransactions({ limit: 6 });
   const { purposes, loading: purposeLoading, reload: reloadPurposes } = usePurposesWithBalances();
   const { count: unassignedCount, reload: reloadUnassigned } = useUnassignedCount();
-  const { openingBalanceEuros, currency } = useSettings();
+  const { openingBalanceEuros, currency, reload: reloadSettings } = useSettings();
 
-  // Reload data every time the tab gains focus (e.g. after Quick-Add)
+  // Reload data every time the tab gains focus (e.g. after Quick-Add, or
+  // after changing opening balance / currency in Settings)
   useFocusEffect(
     useCallback(() => {
       reloadTx();
       reloadPurposes();
       reloadUnassigned();
-    }, [reloadTx, reloadPurposes, reloadUnassigned])
+      reloadSettings();
+    }, [reloadTx, reloadPurposes, reloadUnassigned, reloadSettings])
   );
 
   const loading = txLoading || purposeLoading;

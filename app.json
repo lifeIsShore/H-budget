@@ -6,10 +6,20 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF9F6"
+    },
     "platforms": [
       "android"
     ],
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FAF9F6"
+      },
       "package": "com.ahmet.hbudget",
       "backgroundColor": "#FAF9F6"
     },

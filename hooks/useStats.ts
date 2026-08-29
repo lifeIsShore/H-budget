@@ -56,11 +56,18 @@ export function useAvailableMonths() {
   const [months, setMonths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getAvailableMonths()
-      .then(setMonths)
-      .finally(() => setLoading(false));
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      setMonths(await getAvailableMonths());
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { months, loading };
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { months, loading, reload };
 }

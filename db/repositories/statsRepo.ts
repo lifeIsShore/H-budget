@@ -3,6 +3,14 @@
  *
  * Read-only aggregation queries for the Statistics screen.
  * All amounts returned as integer cents — callers divide by 100 for display.
+ *
+ * Month filtering uses a `date >= ? AND date < ?` range rather than
+ * `substr(date, 1, 7) = ?`. Wrapping an indexed column in a SQL function
+ * prevents SQLite from using idx_transactions_date for a seek — it falls
+ * back to a full table scan every time. A range comparison on the raw
+ * column lets the index do its job; ISO "YYYY-MM-DD" strings sort
+ * correctly as text, so this is a pure performance fix with identical
+ * results.
  */
 
 import { getDb } from "@/db/database";
@@ -48,13 +56,26 @@ export async function getAvailableMonths(): Promise<string[]> {
   return rows.map((r) => r.ym);
 }
 
+/**
+ * [start, end) half-open range for a given year/month, as ISO date strings.
+ * `date >= start AND date < end` is index-friendly, unlike substr(date,1,7)=ym.
+ */
+function monthRange(year: number, month: number): { start: string; end: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const start = `${year}-${pad(month)}-01`;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const end = `${nextYear}-${pad(nextMonth)}-01`;
+  return { start, end };
+}
+
 // ─── summary ──────────────────────────────────────────────────────────────────
 
 export async function getMonthSummary(
   year: number,
   month: number
 ): Promise<MonthSummary> {
-  const ym = toYM(year, month);
+  const { start, end } = monthRange(year, month);
   const row = await getDb().getFirstAsync<{
     received_cents: number;
     spent_cents: number;
@@ -63,8 +84,8 @@ export async function getMonthSummary(
        COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS received_cents,
        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS spent_cents
      FROM transactions
-     WHERE substr(date, 1, 7) = ?`,
-    [ym]
+     WHERE date >= ? AND date < ?`,
+    [start, end]
   );
   return {
     receivedCents: row?.received_cents ?? 0,
@@ -78,7 +99,7 @@ export async function getStatsByPurpose(
   year: number,
   month: number
 ): Promise<PurposeStat[]> {
-  const ym = toYM(year, month);
+  const { start, end } = monthRange(year, month);
   const rows = await getDb().getAllAsync<{
     purpose_id: string;
     purpose_name: string;
@@ -92,11 +113,11 @@ export async function getStatsByPurpose(
        COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) AS spent_cents
      FROM purposes p
      LEFT JOIN transactions t
-       ON t.purpose_id = p.id AND substr(t.date, 1, 7) = ?
+       ON t.purpose_id = p.id AND t.date >= ? AND t.date < ?
      WHERE p.is_active = 1
      GROUP BY p.id
      ORDER BY spent_cents DESC, received_cents DESC`,
-    [ym]
+    [start, end]
   );
   return rows.map((r) => ({
     purposeId: r.purpose_id,
@@ -112,7 +133,7 @@ export async function getStatsByCategory(
   year: number,
   month: number
 ): Promise<CategoryStat[]> {
-  const ym = toYM(year, month);
+  const { start, end } = monthRange(year, month);
   const rows = await getDb().getAllAsync<{
     category_id: string | null;
     category_name: string;
@@ -126,10 +147,10 @@ export async function getStatsByCategory(
        COUNT(*)                          AS transaction_count
      FROM transactions t
      LEFT JOIN categories c ON c.id = t.category_id
-     WHERE t.type = 'expense' AND substr(t.date, 1, 7) = ?
+     WHERE t.type = 'expense' AND t.date >= ? AND t.date < ?
      GROUP BY t.category_id
      ORDER BY total_cents DESC`,
-    [ym]
+    [start, end]
   );
 
   const grandTotal = rows.reduce((s, r) => s + r.total_cents, 0);
@@ -149,7 +170,7 @@ export async function getStatsByVendor(
   year: number,
   month: number
 ): Promise<VendorStat[]> {
-  const ym = toYM(year, month);
+  const { start, end } = monthRange(year, month);
   const rows = await getDb().getAllAsync<{
     vendor: string;
     total_cents: number;
@@ -160,10 +181,10 @@ export async function getStatsByVendor(
        SUM(amount)                      AS total_cents,
        COUNT(*)                         AS transaction_count
      FROM transactions
-     WHERE type = 'expense' AND substr(date, 1, 7) = ?
+     WHERE type = 'expense' AND date >= ? AND date < ?
      GROUP BY vendor
      ORDER BY total_cents DESC`,
-    [ym]
+    [start, end]
   );
 
   const grandTotal = rows.reduce((s, r) => s + r.total_cents, 0);
@@ -174,10 +195,4 @@ export async function getStatsByVendor(
     pctOfTotal: grandTotal > 0 ? r.total_cents / grandTotal : 0,
     transactionCount: r.transaction_count,
   }));
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-function toYM(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, "0")}`;
 }

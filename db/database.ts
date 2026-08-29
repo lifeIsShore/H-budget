@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_transactions_date     ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_transactions_purpose  ON transactions(purpose_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_type     ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_transactions_vendor   ON transactions(vendor COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY NOT NULL,

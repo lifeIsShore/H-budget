@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -63,8 +63,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [hide, opacity],
   );
 
+  // `show` is itself stable (see deps above), but `{ show }` is a fresh
+  // object literal every render — without this useMemo every screen that
+  // calls useToast() would re-render whenever ANY toast shows/hides
+  // anywhere in the app, since Context consumers re-render on value
+  // *identity* change, not on whether the part they read actually changed.
+  const contextValue = useMemo(() => ({ show }), [show]);
+
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {toast && (
         <Animated.View

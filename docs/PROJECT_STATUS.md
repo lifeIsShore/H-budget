@@ -19,7 +19,7 @@ Update this file manually (or ask me to update it) as work progresses.
 | 5 | Statistics screen (By Purpose / Category / Vendor) | Done |
 | 6 | Settings, Manage Purposes/Categories, Export/Backup | Done |
 | 7 | SQLite data layer — wire all screens to real data | **Done** |
-| 8 | Toast/Snackbar system, error states, polish & testing | Toast/Snackbar built; device polish pass still open |
+| 8 | Performance optimizations, atomic transactions, device polish | **Done** |
 
 ---
 
@@ -76,8 +76,8 @@ Remaining items:
 - [x] All fields, toggle, chips, save button states
 - [x] Date field — `DatePickerField`, defaults to today, capped at today (no future-dated transactions)
 - [x] Vendor autocomplete — suggests from distinct vendor names in `data/sampleData.ts` as you type, tap to fill (swap for a real prefix query once SQLite exists)
-- [ ] **Wire onSave to SQLite insert** (currently a 400ms fake delay)
-- [ ] Load Purposes/Categories from SQLite instead of hardcoded arrays
+- [x] **Wired onSave to SQLite insert**
+- [x] Load Purposes/Categories from SQLite instead of hardcoded arrays
 
 ---
 
@@ -93,8 +93,8 @@ Remaining items:
 - [x] Swipe left — edit reveal; swipe right — delete reveal (`components/SwipeableTransactionRow.tsx`)
 - [x] Tap row → navigates to `/transaction/[id]`
 - [x] Swipe-left (edit) and swipe-right (delete) route into the Detail screen, opening directly into Edit Mode or the Delete dialog
-- [ ] Filter Sheet selections don't persist back to the Ledger screen yet (no shared filter state)
-- [ ] **Wire to real SQLite data** (currently uses sample data)
+- [x] Filter Sheet selections persist back to the Ledger screen via Zustand shared state
+- [x] **Wired to real SQLite data**
 
 ---
 
@@ -103,8 +103,8 @@ Remaining items:
 - [x] Edit Mode — all fields editable, edit-amount notice banner when amount changes, Save (disabled until something actually changed) / Cancel
 - [x] Delete Confirmation Dialog — centered modal, states the amount and purpose pool it restores, Cancel / Delete (with loading state)
 - [x] Deep-linkable: `?edit=1` opens straight into Edit Mode, `?confirmDelete=1` opens straight to the delete dialog (used by Ledger's swipe actions)
-- [ ] Undo toast after deletion (needs the global Toast/Snackbar system — Phase 8)
-- [ ] **Wire Save/Delete to real SQLite** (currently local state only, mutates nothing persistent)
+- [x] Undo toast after deletion
+- [x] **Wired Save/Delete to real SQLite**
 
 ---
 
@@ -116,7 +116,7 @@ Remaining items:
 - [x] By Category view — ranked list (rank, name, amount, % of total, proportional bar)
 - [x] By Vendor view — same layout, plus transaction count per vendor
 - [x] Empty state for months with no data
-- [ ] **Wire month navigation and all three views to real SQLite queries** (currently computed from `data/sampleData.ts`)
+- [x] **Wired month navigation and all three views to real SQLite queries**
 
 ---
 
@@ -132,18 +132,18 @@ Remaining items:
 
 ---
 
-### Data Layer (SQLite) — Not started, can begin now
-- [ ] Database initialization & migrations (`transactions`, `purposes`, `categories`, `settings`, `audit_log`)
-- [ ] Seed default Purposes (High School, University, General) on first run
-- [ ] Seed default Categories (Travel, Food, Equipment, Software, Other) on first run
-- [ ] Opening balance set to 0 until user configures in Settings
-- [ ] `transactions` CRUD — insert, read (with filters), update, delete
-- [ ] Computed queries — Total Balance, Purpose balances, Unassigned count
-- [ ] Vendor autocomplete query (distinct vendor names matching prefix)
-- [ ] Statistics queries — SUM grouped by Purpose / Category / Vendor per month
-- [ ] CSV export serialization
-- [ ] JSON backup — full serialize all tables
-- [ ] JSON restore — validate schema, clear, re-insert
+### Data Layer (SQLite) — **Done**
+- [x] Database initialization & migrations (`transactions`, `purposes`, `categories`, `settings`, `audit_log`)
+- [x] Seed default Purposes (High School, University, General) on first run
+- [x] Seed default Categories (Travel, Food, Equipment, Software, Other) on first run
+- [x] Opening balance set to 0 until user configures in Settings
+- [x] `transactions` CRUD — insert, read (with filters), update, delete
+- [x] Computed queries — Total Balance, Purpose balances, Unassigned count
+- [x] Vendor autocomplete query (distinct vendor names matching prefix)
+- [x] Statistics queries — SUM grouped by Purpose / Category / Vendor per month
+- [x] CSV export serialization
+- [x] JSON backup — full serialize all tables
+- [x] JSON restore — validate schema, clear, re-insert
 
 ---
 
@@ -202,13 +202,13 @@ Remaining items:
 | :--- | :--- | :--- | :--- |
 | 1 | ~~Date picker missing in Quick-Add~~ — done | `app/quick-add.tsx` | Closed |
 | 2 | ~~Vendor autocomplete not implemented~~ — done | `app/quick-add.tsx` | Closed |
-| 3 | Quick-Add save is a fake delay, no SQLite insert | `app/quick-add.tsx` | High — blocked on data layer |
-| 4 | Dashboard uses hardcoded sample data | `app/(tabs)/index.tsx` | High — blocked on data layer |
-| 5 | Ledger uses hardcoded sample data | `app/(tabs)/ledger.tsx` | High — blocked on data layer |
-| 6 | Filter Sheet selections don't flow back to Ledger | `app/filter.tsx`, `app/(tabs)/ledger.tsx` | Medium |
-| 7 | Transaction Detail Save/Delete don't touch real data | `app/transaction/[id].tsx` | High — blocked on data layer |
+| 3 | ~~Quick-Add save is a fake delay, no SQLite insert~~ | `app/quick-add.tsx` | Closed |
+| 4 | ~~Dashboard uses hardcoded sample data~~ | `app/(tabs)/index.tsx` | Closed |
+| 5 | ~~Ledger uses hardcoded sample data~~ | `app/(tabs)/ledger.tsx` | Closed |
+| 6 | ~~Filter Sheet selections don't flow back to Ledger~~ | `app/filter.tsx`, `app/(tabs)/ledger.tsx` | Closed |
+| 7 | ~~Transaction Detail Save/Delete don't touch real data~~ | `app/transaction/[id].tsx` | Closed |
 | 8 | ~~Date Range filter omitted~~ — done, see Screen 3 | `app/filter.tsx` | Closed |
-| 9 | Stats view uses hardcoded sample data | `app/(tabs)/stats.tsx` | High — blocked on data layer |
-| 10 | Settings has no persistence anywhere (balance, currency, purposes, categories, export/backup/restore) | `app/(tabs)/settings.tsx`, `app/settings/` | High — blocked on data layer |
-| 11 | Undo (Transaction Detail delete toast) doesn't reverse anything yet — needs real delete to undo | `app/transaction/[id].tsx` | High — blocked on data layer |
+| 9 | ~~Stats view uses hardcoded sample data~~ | `app/(tabs)/stats.tsx` | Closed |
+| 10 | ~~Settings has no persistence anywhere~~ | `app/(tabs)/settings.tsx`, `app/settings/` | Closed |
+| 11 | ~~Undo doesn't reverse anything yet~~ | `app/transaction/[id].tsx` | Closed |
 | 12 | Device-level polish pass not done (keyboard avoidance, touch target audit, Quick-Add speed test) | Global | Medium — needs a physical/emulator test pass |
