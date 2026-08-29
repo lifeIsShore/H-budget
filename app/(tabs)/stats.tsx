@@ -70,11 +70,11 @@ function MonthSelector() {
   return (
     <View className="flex-row items-center justify-center px-4 py-2">
       <Pressable disabled style={{ width: 48, height: 48 }} className="items-center justify-center">
-        <MaterialIcons name="chevron-left" size={24} color="#D8D5CB" />
+        <MaterialIcons name="chevron-left" size={24} color="#A39D8E" />
       </Pressable>
       <Text className="font-sans-semibold text-[15px] text-ink mx-3">August 2026</Text>
       <Pressable disabled style={{ width: 48, height: 48 }} className="items-center justify-center">
-        <MaterialIcons name="chevron-right" size={24} color="#D8D5CB" />
+        <MaterialIcons name="chevron-right" size={24} color="#A39D8E" />
       </Pressable>
     </View>
   );
@@ -111,7 +111,9 @@ function SubTabSwitcher({ tab, onChange }: { tab: SubTab; onChange: (t: SubTab) 
           <Pressable
             key={item.key}
             onPress={() => onChange(item.key)}
-            className="mr-6 pb-2.5"
+            className="mr-6"
+            style={{ minHeight: 44, justifyContent: "flex-end", paddingBottom: 10 }}
+            hitSlop={{ top: 8 }}
           >
             <Text
               className={`font-sans-medium text-[13.5px] ${

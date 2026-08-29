@@ -58,7 +58,7 @@ export default function Ledger() {
       <View className="flex-row items-center gap-2 px-4 pt-3 pb-2">
         <View
           className="flex-1 flex-row items-center bg-surface-alt border border-border rounded-input px-3"
-          style={{ height: 44 }}
+          style={{ height: 48 }}
         >
           <MaterialIcons name="search" size={18} color="#A39D8E" />
           <TextInput

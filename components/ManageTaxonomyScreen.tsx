@@ -128,12 +128,12 @@ export function ManageTaxonomyScreen({
           placeholder={`New ${singularLabel} name...`}
           placeholderTextColor="#A39D8E"
           className="flex-1 font-sans text-[14px] text-ink bg-surface-alt border border-border rounded-input px-3"
-          style={{ height: 44 }}
+          style={{ height: 48 }}
         />
         <Pressable
           onPress={handleAdd}
           disabled={addDisabled}
-          style={{ height: 44 }}
+          style={{ height: 48 }}
           className={`px-4 rounded-button items-center justify-center border ${
             addDisabled ? "border-border" : "border-brand"
           }`}

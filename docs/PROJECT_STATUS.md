@@ -1,8 +1,8 @@
 # H-Budget — Project Status
 
 **Last updated:** 2026-08-29
-**Current phase:** All 6 screens have real UI, global Toast/Snackbar system built — Phase 7 (backend/data layer) is the natural next step
-**Overall progress:** ~80% done
+**Current phase:** All UI-only work complete (screens, Toast system, date picker, vendor autocomplete, date-range filter) — remaining items are genuinely blocked on Phase 7 (backend/data layer)
+**Overall progress:** ~85% done
 
 Update this file manually (or ask me to update it) as work progresses.
 
@@ -23,13 +23,16 @@ Update this file manually (or ask me to update it) as work progresses.
 
 ---
 
-## All 6 screens now have real UI — start the backend
+## All UI-only work is done — the backend is the only thing left blocking progress
 
-Every screen in the spec has a built, styled, stateful UI now (Dashboard,
+Every screen in the spec has a built, styled, stateful UI (Dashboard,
 Quick-Add, Ledger, Transaction Detail/Edit, Statistics, Settings + its two
-sub-screens). None of it is wired to persistent data yet — everything reads
-from `data/sampleData.ts` or holds local component state that resets on
-reload. This is the natural point to start Phase 7:
+sub-screens), the global Toast/Snackbar system is wired in, and the three
+remaining UI-only TODOs (date picker, vendor autocomplete, date-range
+filter) are now closed. Nothing left in `docs/PROJECT_STATUS.md`'s open
+items can move without Phase 7 — every remaining checkbox reads "wire to
+real SQLite" or depends on something that does. This is the point to
+start the data layer:
 
 - Schema + migrations from `04_Data_Model.md`
 - Seed Purposes/Categories on first run
@@ -37,7 +40,7 @@ reload. This is the natural point to start Phase 7:
 - Then one wiring pass: swap each screen's `data/sampleData.ts` import /
   fake-delay handler for a real query or mutation
 
-Nothing left in the UI blocks this — go ahead whenever you're ready.
+Go ahead whenever you're ready — I'll do the wiring pass once it exists.
 
 ---
 
@@ -52,6 +55,8 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 - [x] Base UI components: `Button` (added `muted` variant for neutral Cancel actions, distinct from `ghost`'s negative-text Delete styling), `Chip`, `Card`, `Amount`, `EmptyState`, `Skeleton`
 - [x] `GestureHandlerRootView` wired at root (needed for Ledger swipe actions)
 - [x] `data/sampleData.ts` — single shared sample dataset; every screen imports from it (previously duplicated per-screen)
+- [x] `components/ui/DatePickerField.tsx` — shared native-date-dialog wrapper, used by Quick-Add and the Filter Sheet's date range
+- [x] `@react-native-community/datetimepicker` added to `package.json`
 
 ---
 
@@ -71,8 +76,8 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 
 ### Screen 2: Quick-Add Sheet — Done (UI)
 - [x] All fields, toggle, chips, save button states
-- [ ] Date selector (still missing — needs native DatePicker)
-- [ ] Vendor autocomplete dropdown (currently plain input)
+- [x] Date field — `DatePickerField`, defaults to today, capped at today (no future-dated transactions)
+- [x] Vendor autocomplete — suggests from distinct vendor names in `data/sampleData.ts` as you type, tap to fill (swap for a real prefix query once SQLite exists)
 - [ ] **Wire onSave to SQLite insert** (currently a 400ms fake delay)
 - [ ] Load Purposes/Categories from SQLite instead of hardcoded arrays
 
@@ -83,7 +88,7 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 - [x] Filter button with active-filter dot badge
 - [x] Active filter chip bar + "Clear All" (currently only reflects the
       "unassigned" deep-link from the Dashboard warning banner)
-- [x] Filter Bottom Sheet (`app/filter.tsx`) — Type / Purpose / Category multi-select, Reset/Apply
+- [x] Filter Bottom Sheet (`app/filter.tsx`) — Type / Purpose / Category multi-select, Date Range (`DatePickerField` from/to, mutually constrained), Reset/Apply, now scrollable
 - [x] Transaction list grouped by date, sticky section headers with daily total (`SectionList`)
 - [x] Transaction row layout (icon, vendor, purpose badge, category, amount, time)
 - [x] Empty states (no transactions / no search or filter results)
@@ -91,7 +96,6 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 - [x] Tap row → navigates to `/transaction/[id]`
 - [x] Swipe-left (edit) and swipe-right (delete) route into the Detail screen, opening directly into Edit Mode or the Delete dialog
 - [ ] Filter Sheet selections don't persist back to the Ledger screen yet (no shared filter state)
-- [ ] Date Range filter (needs `@react-native-community/datetimepicker`, not yet a dependency)
 - [ ] **Wire to real SQLite data** (currently uses sample data)
 
 ---
@@ -150,11 +154,20 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 - [x] Settings' Export/Backup/Restore confirmations now go through the real global toast (previously a page-local strip)
 - [x] Transaction Detail's delete now shows an Undo toast (`Deleted <vendor> — EUR <amount>`) — Undo is wired to the toast dismissing itself; it has nothing to actually reverse yet since delete doesn't touch real data (re-insert-on-undo becomes meaningful once Phase 7 exists)
 - [x] `SafeAreaProvider` now wraps the app root (was previously relying on implicit fallback insets — needed explicitly once the Toast reads `useSafeAreaInsets()`)
+- [x] **Code-level audit pass** (touch targets + color-token consistency, done without a device/emulator — see findings below)
 - [ ] Error validation messages (invalid amount, duplicate name, etc.) — duplicate-name validation exists in Manage Purposes/Categories; broader validation messaging elsewhere not yet audited
 - [x] No-emoji icons verified (Material Icons only, all screens)
-- [ ] Keyboard-avoidance tested on Android device
-- [ ] All touch targets verified >= 48dp on device
-- [ ] Quick-Add speed test: entry to save in < 5 seconds
+- [ ] Keyboard-avoidance tested on Android device — needs a physical/emulator pass, not code-auditable
+- [ ] All touch targets verified >= 48dp **on device** — code-level pass done (see below); still wants a real-device tap-accuracy check
+- [ ] Quick-Add speed test: entry to save in < 5 seconds — needs a device/emulator, not code-auditable
+
+**Code audit findings (fixed):**
+- Stats sub-tab buttons (By Purpose/Category/Vendor) had almost no touch target — text plus 10px padding, ~24dp total. Given `minHeight: 44` + `hitSlop`.
+- `ManageTaxonomyScreen`'s "Add" button and its adjacent text input were 44dp, inconsistent with the 48dp standard used everywhere else. Bumped both to 48.
+- Quick-Add's vendor-autocomplete suggestion rows were 44dp — bumped to 48.
+- Ledger's search bar container was 44dp (the only input field in the app not on the 48dp grid) — bumped to 48.
+- Stats' disabled month-arrow icons used an undocumented one-off hex (`#D8D5CB`) instead of a design token — replaced with `ink-faint` (`#A39D8E`), the token `Button`'s own disabled state already uses.
+- Everything else scanned (icon colors, overlay opacity, dialog/sheet radii) traces back to `docs/DESIGN_SYSTEM.md` tokens correctly — no other stray values found.
 
 ---
 
@@ -180,6 +193,7 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 | [components/SwipeableTransactionRow.tsx](../components/SwipeableTransactionRow.tsx) | Swipeable ledger row |
 | [components/ManageTaxonomyScreen.tsx](../components/ManageTaxonomyScreen.tsx) | Shared edit/delete/add list, used by both Manage Purposes/Categories |
 | [components/ToastProvider.tsx](../components/ToastProvider.tsx) | Global Toast/Snackbar — `useToast()` hook, mounted once in `app/_layout.tsx` |
+| [components/ui/DatePickerField.tsx](../components/ui/DatePickerField.tsx) | Shared native date-picker field, used by Quick-Add and the Filter Sheet |
 | [components/ui/](../components/ui/) | Reusable base UI components |
 
 ---
@@ -188,14 +202,14 @@ Nothing left in the UI blocks this — go ahead whenever you're ready.
 
 | # | Issue | File | Priority |
 | :--- | :--- | :--- | :--- |
-| 1 | Date picker missing in Quick-Add | `app/quick-add.tsx` | High |
-| 2 | Vendor autocomplete not implemented | `app/quick-add.tsx` | Medium |
+| 1 | ~~Date picker missing in Quick-Add~~ — done | `app/quick-add.tsx` | Closed |
+| 2 | ~~Vendor autocomplete not implemented~~ — done | `app/quick-add.tsx` | Closed |
 | 3 | Quick-Add save is a fake delay, no SQLite insert | `app/quick-add.tsx` | High — blocked on data layer |
 | 4 | Dashboard uses hardcoded sample data | `app/(tabs)/index.tsx` | High — blocked on data layer |
 | 5 | Ledger uses hardcoded sample data | `app/(tabs)/ledger.tsx` | High — blocked on data layer |
 | 6 | Filter Sheet selections don't flow back to Ledger | `app/filter.tsx`, `app/(tabs)/ledger.tsx` | Medium |
 | 7 | Transaction Detail Save/Delete don't touch real data | `app/transaction/[id].tsx` | High — blocked on data layer |
-| 8 | Date Range filter omitted (needs a date-picker dependency) | `app/filter.tsx` | Low |
+| 8 | ~~Date Range filter omitted~~ — done, see Screen 3 | `app/filter.tsx` | Closed |
 | 9 | Stats view uses hardcoded sample data | `app/(tabs)/stats.tsx` | High — blocked on data layer |
 | 10 | Settings has no persistence anywhere (balance, currency, purposes, categories, export/backup/restore) | `app/(tabs)/settings.tsx`, `app/settings/` | High — blocked on data layer |
 | 11 | Undo (Transaction Detail delete toast) doesn't reverse anything yet — needs real delete to undo | `app/transaction/[id].tsx` | High — blocked on data layer |

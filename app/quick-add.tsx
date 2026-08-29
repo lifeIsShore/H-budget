@@ -12,15 +12,24 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
+import { DatePickerField } from "@/components/ui/DatePickerField";
+import { sampleTransactions } from "@/data/sampleData";
 
 /**
  * UI-only — form state is local; wire onSave to the SQLite insert once the
  * data layer exists. Matches the field set in 03_Features.md section 2 and
- * the component spec in 05_UI_UX_Specification.md Screen 2.
+ * the component spec in 05_UI_UX_Specification.md Screen 2. Vendor
+ * autocomplete suggests from distinct vendor names already in
+ * data/sampleData.ts — swap for a real prefix query once SQLite exists
+ * (see Data Layer checklist item "Vendor autocomplete query").
  */
 
 const purposes = ["University", "High School", "General"];
 const categories = ["Travel", "Food", "Equipment", "Software", "Other"];
+
+const knownVendors = Array.from(
+  new Set(sampleTransactions.map((t) => t.vendor).filter((v): v is string => !!v)),
+);
 
 export default function QuickAddSheet() {
   const { mode: initialMode } = useLocalSearchParams<{ mode?: string }>();
@@ -28,7 +37,9 @@ export default function QuickAddSheet() {
     initialMode === "income" ? "income" : "expense",
   );
   const [amount, setAmount] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
   const [vendor, setVendor] = useState("");
+  const [vendorFocused, setVendorFocused] = useState(false);
   const [purpose, setPurpose] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -39,6 +50,15 @@ export default function QuickAddSheet() {
   const canSave = !Number.isNaN(numericAmount) && numericAmount > 0;
 
   const amountColor = useMemo(() => (isExpense ? "#B5473A" : "#3F7A5C"), [isExpense]);
+
+  const vendorSuggestions = useMemo(() => {
+    const q = vendor.trim().toLowerCase();
+    if (!q) return [];
+    return knownVendors.filter(
+      (v) => v.toLowerCase().includes(q) && v.toLowerCase() !== q,
+    );
+  }, [vendor]);
+  const showSuggestions = vendorFocused && vendorSuggestions.length > 0;
 
   function close() {
     router.back();
@@ -100,17 +120,44 @@ export default function QuickAddSheet() {
               <View className="h-px bg-border w-full mt-3" />
             </View>
 
+            {/* Date */}
+            <View className="mt-4">
+              <DatePickerField label="Date" value={date} onChange={setDate} maxDate={new Date()} />
+            </View>
+
             {/* Vendor / Source */}
-            <Field label={isExpense ? "Vendor / Store" : "Source / Payer"}>
+            <View className="mt-4">
+              <Text className="font-sans text-[12.5px] text-ink-muted mb-1.5">
+                {isExpense ? "Vendor / Store" : "Source / Payer"}
+              </Text>
               <TextInput
                 value={vendor}
                 onChangeText={setVendor}
+                onFocus={() => setVendorFocused(true)}
+                onBlur={() => setTimeout(() => setVendorFocused(false), 120)}
                 placeholder={isExpense ? "e.g. Deutsche Bahn" : "e.g. Mentorship Grant"}
                 placeholderTextColor="#A39D8E"
                 className="font-sans text-[14px] text-ink bg-surface-alt border border-border rounded-input px-3"
                 style={{ height: 48 }}
               />
-            </Field>
+              {showSuggestions && (
+                <View className="bg-surface border border-border rounded-input mt-1 overflow-hidden">
+                  {vendorSuggestions.slice(0, 4).map((v) => (
+                    <Pressable
+                      key={v}
+                      onPress={() => {
+                        setVendor(v);
+                        setVendorFocused(false);
+                      }}
+                      className="px-3 border-b border-border active:bg-surface-alt"
+                      style={{ height: 48, justifyContent: "center" }}
+                    >
+                      <Text className="font-sans text-[13.5px] text-ink">{v}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
 
             {/* Purpose */}
             <Field label="Purpose">

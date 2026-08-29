@@ -1,24 +1,25 @@
 import { useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 
 const purposes = ["University", "High School", "General"];
 const categories = ["Travel", "Food", "Equipment", "Software", "Other"];
 
 /**
  * UI-only — selections don't persist back to the Ledger screen yet (no
- * shared filter state / router params wiring). Date range intentionally
- * omitted: needs @react-native-community/datetimepicker, not yet a
- * dependency — same open TODO as the date field in quick-add.tsx.
+ * shared filter state / router params wiring).
  */
 export default function FilterSheet() {
   const [types, setTypes] = useState<string[]>(["All"]);
   const [selPurposes, setSelPurposes] = useState<string[]>([]);
   const [selCategories, setSelCategories] = useState<string[]>([]);
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -37,6 +38,8 @@ export default function FilterSheet() {
     setTypes(["All"]);
     setSelPurposes([]);
     setSelCategories([]);
+    setFromDate(null);
+    setToDate(null);
   }
 
   function close() {
@@ -59,12 +62,34 @@ export default function FilterSheet() {
           </Pressable>
         </View>
 
-        <View className="px-4 pb-2">
+        <View className="px-4 pb-2 flex-1">
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <FilterGroup label="Transaction Type">
             {["All", "Income", "Expense"].map((t) => (
               <Chip key={t} label={t} selected={types.includes(t)} onPress={() => toggleType(t)} />
             ))}
           </FilterGroup>
+
+          <View className="mt-4">
+            <Text className="font-sans text-[12.5px] text-ink-muted mb-1.5">Date Range</Text>
+            <View className="flex-row gap-2.5">
+              <DatePickerField
+                label=""
+                value={fromDate}
+                onChange={setFromDate}
+                maxDate={toDate ?? new Date()}
+                placeholder="From"
+              />
+              <DatePickerField
+                label=""
+                value={toDate}
+                onChange={setToDate}
+                minDate={fromDate ?? undefined}
+                maxDate={new Date()}
+                placeholder="To"
+              />
+            </View>
+          </View>
 
           <FilterGroup label="Purpose">
             {purposes.map((p) => (
@@ -103,6 +128,7 @@ export default function FilterSheet() {
               <Button label="Apply" variant="primary" onPress={close} />
             </View>
           </View>
+          </ScrollView>
         </View>
       </SafeAreaView>
     </View>
